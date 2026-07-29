@@ -1,0 +1,6 @@
+{
+  "name": "DineFlow",
+  "description": "DineFlow Restaurant Operating System - QR Customer Ordering, Owner Analytics & Management, Kitchen Display System (KDS), and Waiter Terminal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

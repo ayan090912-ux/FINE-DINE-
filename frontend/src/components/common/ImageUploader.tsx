@@ -1,0 +1,97 @@
+import React, { useRef } from 'react';
+import { Upload, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
+
+interface ImageUploaderProps {
+  label?: string;
+  value?: string;
+  onChange: (url: string) => void;
+  aspectRatio?: 'square' | 'cover' | 'banner';
+  className?: string;
+}
+
+export const ImageUploader: React.FC<ImageUploaderProps> = ({
+  label,
+  value,
+  onChange,
+  aspectRatio = 'square',
+  className = '',
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        onChange(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const aspectClasses = {
+    square: 'aspect-square max-w-[180px]',
+    cover: 'aspect-[16/9] w-full',
+    banner: 'aspect-[21/9] w-full',
+  }[aspectRatio];
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {label && <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">{label}</label>}
+      {value ? (
+        <div className={`relative group rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 ${aspectClasses}`}>
+          <img src={value} alt="Uploaded preview" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 rounded-lg bg-zinc-800 text-zinc-100 hover:bg-zinc-700 transition"
+              title="Replace image"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition"
+              title="Remove image"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed border-zinc-800 hover:border-zinc-600 bg-zinc-900/50 hover:bg-zinc-900/80 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center ${aspectClasses}`}
+        >
+          <div className="w-10 h-10 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 mb-2">
+            <Upload className="w-5 h-5" />
+          </div>
+          <p className="text-xs font-medium text-zinc-300">Drag & drop or <span className="text-amber-400 underline">browse</span></p>
+          <p className="text-[10px] text-zinc-500 mt-1">PNG, JPG, WEBP up to 10MB</p>
+        </div>
+      )}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleFile(e.target.files[0]);
+          }
+        }}
+      />
+    </div>
+  );
+};

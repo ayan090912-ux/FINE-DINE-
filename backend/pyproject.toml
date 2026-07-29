@@ -1,0 +1,40 @@
+[project]
+name = "dineflow-backend"
+version = "1.0.0"
+description = "Production-grade multi-tenant restaurant QR ordering SaaS backend"
+authors = [{ name = "DineFlow Engineering Team", email = "tech@dineflow.io" }]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "sqlalchemy>=2.0.30",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    "redis>=5.0.4",
+    "python-jose>=3.3.0",
+    "passlib>=1.7.4",
+    "bcrypt>=4.1.2",
+    "websockets>=12.0",
+    "python-multipart>=0.0.9",
+    "qrcode>=7.4.2",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W", "C90", "I", "N", "UP", "ASYNC", "S", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TCH", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "RUF"]
+ignore = ["B008", "E501", "S101", "TRY003", "EM101"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]

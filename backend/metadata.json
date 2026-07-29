@@ -1,0 +1,6 @@
+{
+  "name": "DineFlow SaaS Backend",
+  "description": "Production-ready multi-tenant restaurant QR ordering and management SaaS backend powered by FastAPI, SQLAlchemy 2, PostgreSQL, Redis, WebSockets, and Pydantic v2.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

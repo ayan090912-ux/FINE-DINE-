@@ -314,6 +314,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       <CallWaiterModal
         isOpen={isCallWaiterOpen}
         onClose={() => setIsCallWaiterOpen(false)}
+        restaurantId={restaurantId}
         tableId={activeTable.id}
       />
 

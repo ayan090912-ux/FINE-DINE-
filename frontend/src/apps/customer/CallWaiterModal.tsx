@@ -8,12 +8,14 @@ import { createServiceRequestViaApi } from '../../services/api';
 interface CallWaiterModalProps {
   isOpen: boolean;
   onClose: () => void;
+  restaurantId: string;
   tableId: string;
 }
 
 export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
   isOpen,
   onClose,
+  restaurantId,
   tableId,
 }) => {
   const { settings } = useStore();
@@ -24,7 +26,7 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
 
   const handleRequest = async (type: ServiceRequestType) => {
     try {
-      await createServiceRequestViaApi(settings.id, tableId, type, customNote.trim() ? customNote : undefined);
+      await createServiceRequestViaApi(restaurantId, tableId, type, customNote.trim() ? customNote : undefined);
       setSubmittedType(type);
       setTimeout(() => {
         setSubmittedType(null);

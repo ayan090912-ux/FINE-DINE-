@@ -3,6 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { X, Trash2, Plus, Minus, Tag, Check, ArrowRight, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VegBadge } from '../../components/common/StatusBadge';
+import { createOrderViaApi } from '../../services/api';
 
 export interface CartItem {
   menuItemId: string;
@@ -14,6 +15,7 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   cart: CartItem[];
+  restaurantId: string;
   tableId: string;
   onUpdateQuantity: (menuItemId: string, qty: number) => void;
   onClearCart: () => void;
@@ -24,12 +26,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   isOpen,
   onClose,
   cart,
+  restaurantId,
   tableId,
   onUpdateQuantity,
   onClearCart,
   onOrderPlaced,
 }) => {
-  const { menuItems, promotions, settings, createOrder } = useStore();
+  const { menuItems, promotions, settings } = useStore();
   const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,22 +75,27 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const taxAmount = (subtotal - discountAmount) * (settings.taxPercentage / 100);
   const finalTotal = Math.max(0, subtotal - discountAmount + taxAmount);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      createOrder(
+    try {
+      await createOrderViaApi(
+        restaurantId,
         tableId,
         cart.map((c) => ({ menuItemId: c.menuItemId, quantity: c.quantity, specialNotes: c.specialNotes })),
         activePromoName,
         discountAmount
       );
-      setIsSubmitting(false);
       onClearCart();
       onOrderPlaced();
       onClose();
-    }, 600);
+    } catch (error) {
+      console.error('Order submission failed', error);
+      alert(error instanceof Error ? error.message : 'Unable to create order right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

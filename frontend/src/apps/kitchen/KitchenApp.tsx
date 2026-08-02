@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Order, OrderStatus } from '../../types';
 import { OrderStatusBadge, VegBadge } from '../../components/common/StatusBadge';
+import { fetchRestaurantOrders, updateOrderStatusViaApi } from '../../services/api';
 import {
   ChefHat,
   Clock,
@@ -18,13 +19,30 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const { orders, updateOrderStatus, updateOrderEta, settings } = useStore();
+  const { settings } = useStore();
+  const [orders, setOrders] = useState<Order[]>([]);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'all' | 'active' | 'ready' | 'completed'>('active');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // ETA Modal state for active order
   const [etaModalOrder, setEtaModalOrder] = useState<Order | null>(null);
   const [customEta, setCustomEta] = useState<number>(15);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const restaurantId = settings.id || 'dineflow';
+        const data = await fetchRestaurantOrders(restaurantId);
+        setOrders(data);
+      } catch (error) {
+        console.error('Unable to load kitchen orders', error);
+      }
+    };
+
+    loadOrders();
+    const intervalId = window.setInterval(loadOrders, 8000);
+    return () => window.clearInterval(intervalId);
+  }, [settings.id]);
 
   const filteredOrders = orders.filter((o) => {
     if (selectedStatusFilter === 'active') {
@@ -44,10 +62,25 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
     setCustomEta(order.items.reduce((acc, i) => Math.max(acc, 12), 15));
   };
 
-  const handleConfirmEta = () => {
-    if (etaModalOrder) {
-      updateOrderEta(etaModalOrder.id, customEta);
+  const handleConfirmEta = async () => {
+    if (!etaModalOrder) return;
+    try {
+      await updateOrderStatusViaApi(etaModalOrder.id, 'preparing');
+      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
+      setOrders(next);
       setEtaModalOrder(null);
+    } catch (error) {
+      console.error('Unable to update ETA', error);
+    }
+  };
+
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    try {
+      await updateOrderStatusViaApi(orderId, status);
+      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
+      setOrders(next);
+    } catch (error) {
+      console.error('Unable to update order status', error);
     }
   };
 
@@ -225,7 +258,7 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
                           Update ETA
                         </button>
                         <button
-                          onClick={() => updateOrderStatus(order.id, 'ready')}
+                          onClick={() => handleStatusChange(order.id, 'ready')}
                           className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
                         >
                           <CheckCircle className="w-4 h-4" />
@@ -236,7 +269,7 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
 
                     {order.status === 'ready' && (
                       <button
-                        onClick={() => updateOrderStatus(order.id, 'delivered')}
+                        onClick={() => handleStatusChange(order.id, 'delivered')}
                         className="w-full bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
                       >
                         <CheckCheck className="w-4 h-4" />

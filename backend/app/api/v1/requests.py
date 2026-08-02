@@ -1,15 +1,40 @@
-from typing import List
-from fastapi import APIRouter, Depends
+from typing import List, Optional
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.common import APIResponse
-from app.schemas.customer_request import CustomerRequestResponse, CustomerRequestStatusUpdate
+from app.schemas.customer_request import CustomerRequestCreate, CustomerRequestResponse, CustomerRequestStatusUpdate
 from app.services.customer_request_service import CustomerRequestService
 
 router = APIRouter(prefix="/requests", tags=["Customer Requests (Waiter Calls)"])
+
+
+@router.post("", response_model=APIResponse[CustomerRequestResponse])
+async def create_customer_request(
+    data: CustomerRequestCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a customer request from the mobile customer experience."""
+    service = CustomerRequestService(db)
+    request = await service.create_request(data)
+    return APIResponse(message="Request sent to staff.", data=request)
+
+
+@router.get("", response_model=APIResponse[List[CustomerRequestResponse]])
+async def list_customer_requests(
+    restaurant_id: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db)
+):
+    """List active requests for a restaurant without requiring staff login."""
+    service = CustomerRequestService(db)
+    if restaurant_id:
+        requests = await service.get_active_requests(restaurant_id)
+    else:
+        requests = []
+    return APIResponse(message="Active customer requests retrieved.", data=requests)
 
 
 @router.get("/active", response_model=APIResponse[List[CustomerRequestResponse]])

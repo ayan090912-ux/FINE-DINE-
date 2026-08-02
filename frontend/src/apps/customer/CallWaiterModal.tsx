@@ -3,6 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { ServiceRequestType } from '../../types';
 import { X, GlassWater, Utensils, ScrollText, Receipt, BellRing, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createServiceRequestViaApi } from '../../services/api';
 
 interface CallWaiterModalProps {
   isOpen: boolean;
@@ -15,20 +16,25 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
   onClose,
   tableId,
 }) => {
-  const { createServiceRequest } = useStore();
+  const { settings } = useStore();
   const [customNote, setCustomNote] = useState('');
   const [submittedType, setSubmittedType] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleRequest = (type: ServiceRequestType) => {
-    createServiceRequest(tableId, type, customNote.trim() ? customNote : undefined);
-    setSubmittedType(type);
-    setTimeout(() => {
-      setSubmittedType(null);
-      setCustomNote('');
-      onClose();
-    }, 1200);
+  const handleRequest = async (type: ServiceRequestType) => {
+    try {
+      await createServiceRequestViaApi(settings.id, tableId, type, customNote.trim() ? customNote : undefined);
+      setSubmittedType(type);
+      setTimeout(() => {
+        setSubmittedType(null);
+        setCustomNote('');
+        onClose();
+      }, 1200);
+    } catch (error) {
+      console.error('Request submission failed', error);
+      alert(error instanceof Error ? error.message : 'Unable to send request right now.');
+    }
   };
 
   const requests: { type: ServiceRequestType; label: string; icon: React.ElementType; color: string }[] = [

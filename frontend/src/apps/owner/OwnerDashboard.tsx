@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import {
   DollarSign,
@@ -14,12 +14,39 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { OrderStatusBadge } from '../../components/common/StatusBadge';
+import { fetchRestaurantOrders, updateOrderStatusViaApi } from '../../services/api';
 
 export const OwnerDashboard: React.FC<{
   onNavigateToBusinessDay?: () => void;
   onNavigateToOrders?: () => void;
 }> = ({ onNavigateToBusinessDay, onNavigateToOrders }) => {
-  const { orders, tables, menuItems, feedbacks, settings, currentDailyOrderSequence, updateOrderStatus, cancelOrder } = useStore();
+  const { tables, menuItems, feedbacks, settings, currentDailyOrderSequence } = useStore();
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const data = await fetchRestaurantOrders(settings.id || 'dineflow');
+        setOrders(data);
+      } catch (error) {
+        console.error('Unable to load owner orders', error);
+      }
+    };
+
+    loadOrders();
+    const intervalId = window.setInterval(loadOrders, 10000);
+    return () => window.clearInterval(intervalId);
+  }, [settings.id]);
+
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    try {
+      await updateOrderStatusViaApi(orderId, status);
+      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
+      setOrders(next);
+    } catch (error) {
+      console.error('Unable to update order status', error);
+    }
+  };
 
   // Metrics calculation
   const totalRevenue = orders.reduce((acc, curr) => acc + curr.totalAmount, 0);
@@ -300,7 +327,7 @@ export const OwnerDashboard: React.FC<{
                     <td className="py-3 text-right">
                       {order.status === 'received' && (
                         <button
-                          onClick={() => updateOrderStatus(order.id, 'preparing')}
+                          onClick={() => handleStatusChange(order.id, 'preparing')}
                           className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-[11px] transition cursor-pointer"
                         >
                           Accept
@@ -308,7 +335,7 @@ export const OwnerDashboard: React.FC<{
                       )}
                       {order.status === 'preparing' && (
                         <button
-                          onClick={() => updateOrderStatus(order.id, 'ready')}
+                          onClick={() => handleStatusChange(order.id, 'ready')}
                           className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-[11px] transition cursor-pointer"
                         >
                           Mark Ready
@@ -316,7 +343,7 @@ export const OwnerDashboard: React.FC<{
                       )}
                       {order.status === 'ready' && (
                         <button
-                          onClick={() => updateOrderStatus(order.id, 'delivered')}
+                          onClick={() => handleStatusChange(order.id, 'delivered')}
                           className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold text-[11px] transition cursor-pointer"
                         >
                           Deliver
@@ -324,7 +351,7 @@ export const OwnerDashboard: React.FC<{
                       )}
                       {order.status === 'delivered' && (
                         <button
-                          onClick={() => updateOrderStatus(order.id, 'completed')}
+                          onClick={() => handleStatusChange(order.id, 'completed')}
                           className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border border-zinc-700 font-bold text-[11px] transition cursor-pointer"
                         >
                           Close

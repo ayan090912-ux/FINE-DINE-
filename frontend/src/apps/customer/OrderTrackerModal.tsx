@@ -9,14 +9,17 @@ interface OrderTrackerModalProps {
   isOpen: boolean;
   onClose: () => void;
   tableId: string;
+  orders: Order[];
+  currencySymbol: string;
 }
 
 export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
   isOpen,
   onClose,
   tableId,
+  orders,
+  currencySymbol,
 }) => {
-  const { orders, settings } = useStore();
   const [, setTick] = useState(0);
 
   // Force tick every second to keep countdown timers live!
@@ -120,7 +123,7 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
                           </span>
                         </div>
                         <p className="text-xs text-zinc-400 mt-0.5">
-                          {order.items.length} {order.items.length === 1 ? 'item' : 'items'} • Total {settings.currencySymbol}{order.totalAmount.toFixed(2)}
+                          {order.items.length} {order.items.length === 1 ? 'item' : 'items'} • Total {currencySymbol}{order.totalAmount.toFixed(2)}
                         </p>
                       </div>
 
@@ -174,7 +177,7 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
                             </span>
                           </div>
                           <span className="text-zinc-400 font-mono">
-                            {settings.currencySymbol}{(item.price * item.quantity).toFixed(2)}
+                            {currencySymbol}{(item.price * item.quantity).toFixed(2)}
                           </span>
                         </div>
                       ))}

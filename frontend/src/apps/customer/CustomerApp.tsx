@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { MenuItem } from '../../types';
+import { Category, MenuItem, Order } from '../../types';
 import { CustomerHeader } from './CustomerHeader';
 import { FoodCard } from './FoodCard';
 import { FoodDetailModal } from './FoodDetailModal';
@@ -9,6 +9,7 @@ import { OrderTrackerModal } from './OrderTrackerModal';
 import { CallWaiterModal } from './CallWaiterModal';
 import { FeedbackModal } from './FeedbackModal';
 import { Search, Utensils, Filter } from 'lucide-react';
+import { fetchPublicMenu, fetchRestaurantOrders } from '../../services/api';
 
 interface CustomerAppProps {
   restaurantId: string;
@@ -16,9 +17,13 @@ interface CustomerAppProps {
 }
 
 export const CustomerApp: React.FC<CustomerAppProps> = ({
+  restaurantId,
   tableId,
 }) => {
-  const { categories, menuItems, tables, orders } = useStore();
+  const { tables, settings } = useStore();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +76,33 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   };
 
   const cartCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [menuData, orderData] = await Promise.all([
+          fetchPublicMenu(restaurantId),
+          fetchRestaurantOrders(restaurantId),
+        ]);
+
+        if (!isMounted) return;
+        setCategories(menuData.categories);
+        setMenuItems(menuData.menuItems);
+        setOrders(orderData);
+      } catch (error) {
+        console.error('Unable to load customer menu or orders', error);
+      }
+    };
+
+    loadData();
+    const intervalId = window.setInterval(loadData, 10000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [restaurantId]);
 
   // Menu filtering
   const filteredMenuItems = menuItems.filter((item) => {
@@ -260,16 +292,22 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         cart={cart}
+        restaurantId={restaurantId}
         tableId={activeTable.id}
         onUpdateQuantity={handleUpdateCartQuantity}
         onClearCart={() => setCart([])}
-        onOrderPlaced={() => setIsOrdersOpen(true)}
+        onOrderPlaced={() => {
+          setIsOrdersOpen(true);
+          fetchRestaurantOrders(restaurantId).then(setOrders).catch(console.error);
+        }}
       />
 
       <OrderTrackerModal
         isOpen={isOrdersOpen}
         onClose={() => setIsOrdersOpen(false)}
         tableId={activeTable.id}
+        orders={orders}
+        currencySymbol={settings.currencySymbol}
       />
 
       <CallWaiterModal

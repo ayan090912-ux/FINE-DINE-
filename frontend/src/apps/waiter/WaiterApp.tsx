@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import {
   BellRing,
@@ -14,10 +14,53 @@ import {
   Clock,
 } from 'lucide-react';
 import { OrderStatusBadge } from '../../components/common/StatusBadge';
+import { fetchRestaurantOrders, fetchRestaurantRequests, updateOrderStatusViaApi, updateServiceRequestStatusViaApi } from '../../services/api';
 
 export const WaiterApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const { orders, serviceRequests, updateOrderStatus, fulfillServiceRequest, settings } = useStore();
+  const { settings } = useStore();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'requests' | 'ready_orders' | 'history'>('requests');
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const restaurantId = settings.id || 'dineflow';
+        const [orderData, requestData] = await Promise.all([
+          fetchRestaurantOrders(restaurantId),
+          fetchRestaurantRequests(restaurantId),
+        ]);
+        setOrders(orderData);
+        setServiceRequests(requestData);
+      } catch (error) {
+        console.error('Unable to load waiter dashboard data', error);
+      }
+    };
+
+    loadData();
+    const intervalId = window.setInterval(loadData, 10000);
+    return () => window.clearInterval(intervalId);
+  }, [settings.id]);
+
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    try {
+      await updateOrderStatusViaApi(orderId, status);
+      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
+      setOrders(next);
+    } catch (error) {
+      console.error('Unable to update order status', error);
+    }
+  };
+
+  const handleFulfillRequest = async (requestId: string) => {
+    try {
+      await updateServiceRequestStatusViaApi(requestId);
+      const requestData = await fetchRestaurantRequests(settings.id || 'dineflow');
+      setServiceRequests(requestData);
+    } catch (error) {
+      console.error('Unable to fulfill request', error);
+    }
+  };
 
   // Filter requests
   const pendingRequests = serviceRequests.filter((r) => r.status !== 'fulfilled');
@@ -151,7 +194,7 @@ export const WaiterApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     </div>
 
                     <button
-                      onClick={() => fulfillServiceRequest(req.id)}
+                      onClick={() => handleFulfillRequest(req.id)}
                       className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-emerald-500/20"
                     >
                       <CheckCheck className="w-4 h-4" />
@@ -197,7 +240,7 @@ export const WaiterApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                   </div>
 
                   <button
-                    onClick={() => updateOrderStatus(order.id, 'delivered')}
+                    onClick={() => handleStatusChange(order.id, 'delivered')}
                     className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold text-xs transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-cyan-500/20"
                   >
                     <CheckCheck className="w-4 h-4" />

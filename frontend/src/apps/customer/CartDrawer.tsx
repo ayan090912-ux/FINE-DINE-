@@ -17,6 +17,18 @@ interface CartDrawerProps {
   cart: CartItem[];
   restaurantId: string;
   tableId: string;
+  menuItems: Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    category: string;
+    prepTimeMinutes: number;
+    vegType: 'veg' | 'non-veg' | 'egg';
+    available: boolean;
+    imageUrl: string;
+    spicyLevel?: number;
+  }>;
   onUpdateQuantity: (menuItemId: string, qty: number) => void;
   onClearCart: () => void;
   onOrderPlaced: () => void;
@@ -28,11 +40,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   cart,
   restaurantId,
   tableId,
+  menuItems,
   onUpdateQuantity,
   onClearCart,
   onOrderPlaced,
 }) => {
-  const { menuItems, promotions, settings } = useStore();
+  const { promotions, settings } = useStore();
   const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

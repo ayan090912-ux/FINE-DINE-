@@ -61,7 +61,7 @@ class MenuService:
         return await self.item_repo.soft_delete(item_id)
 
     async def get_public_menu(self, restaurant_id: str) -> PublicMenuResponse:
-        restaurant = await self.restaurant_repo.get_by_id(restaurant_id)
+        restaurant = await self.restaurant_repo.get_by_identifier(restaurant_id)
         if not restaurant or not restaurant.is_active:
             raise NotFoundException("Restaurant", restaurant_id)
 

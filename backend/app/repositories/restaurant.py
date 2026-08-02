@@ -14,6 +14,12 @@ class RestaurantRepository(BaseRepository[Restaurant]):
         result = await self.session.execute(query)
         return result.scalars().first()
 
+    async def get_by_identifier(self, identifier: str) -> Optional[Restaurant]:
+        restaurant = await self.get_by_id(identifier)
+        if restaurant:
+            return restaurant
+        return await self.get_by_slug(identifier)
+
 
 class BranchRepository(BaseRepository[Branch]):
     def __init__(self, session: AsyncSession):

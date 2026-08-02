@@ -4,6 +4,7 @@ from app.core.exceptions import NotFoundException
 from app.models.enums import RequestStatus
 from app.models.order import CustomerRequest
 from app.repositories.customer_request import CustomerRequestRepository
+from app.repositories.restaurant import RestaurantRepository
 from app.repositories.table import TableRepository
 from app.schemas.customer_request import CustomerRequestCreate, CustomerRequestStatusUpdate
 from app.websockets.connection_manager import ws_manager
@@ -14,9 +15,14 @@ class CustomerRequestService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.request_repo = CustomerRequestRepository(session)
+        self.restaurant_repo = RestaurantRepository(session)
         self.table_repo = TableRepository(session)
 
     async def create_request(self, data: CustomerRequestCreate) -> CustomerRequest:
+        restaurant = await self.restaurant_repo.get_by_identifier(data.restaurant_id)
+        if not restaurant or not restaurant.is_active:
+            raise NotFoundException("Restaurant", data.restaurant_id)
+
         table = await self.table_repo.get_by_id(data.table_id)
         if not table:
             raise NotFoundException("Table", data.table_id)
@@ -60,4 +66,7 @@ class CustomerRequestService:
         return req
 
     async def get_active_requests(self, restaurant_id: str) -> List[CustomerRequest]:
-        return await self.request_repo.get_active_requests(restaurant_id)
+        restaurant = await self.restaurant_repo.get_by_identifier(restaurant_id)
+        if not restaurant:
+            return []
+        return await self.request_repo.get_active_requests(restaurant.id)

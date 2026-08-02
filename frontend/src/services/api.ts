@@ -1,6 +1,6 @@
 import { Category, MenuItem, Order, OrderStatus, ServiceRequest, ServiceRequestType } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://the-fine-flow.onrender.com').replace(/\/$/, '');
 
 async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
@@ -148,13 +148,14 @@ export const normalizeMenuItem = (raw: any): MenuItem => ({
 
 export const fetchPublicMenu = async (restaurantId: string) => {
   const payload = await apiRequest<any>(`/api/v1/public/menu/${restaurantId}`);
-  const categories = (payload?.categories || []).map(normalizeCategory);
-  const menuItems = (payload?.categories || []).flatMap((category: any) => (category.items || []).map(normalizeMenuItem));
+  const categories = (payload?.data?.categories || payload?.categories || []).map(normalizeCategory);
+  const menuItems = (payload?.data?.categories || payload?.categories || []).flatMap((category: any) => (category.items || []).map(normalizeMenuItem));
   return { categories, menuItems };
 };
 
 export const fetchRestaurantOrders = async (restaurantId: string) => {
-  const data = await apiRequest<any[]>(`/api/v1/orders?restaurant_id=${encodeURIComponent(restaurantId)}`);
+  const payload = await apiRequest<any>(`/api/v1/orders?restaurant_id=${encodeURIComponent(restaurantId)}`);
+  const data = payload?.data ?? payload;
   return (data || []).map(normalizeOrder);
 };
 
@@ -173,7 +174,7 @@ export const createOrderViaApi = async (restaurantId: string, tableId: string, i
     })),
   };
 
-  const result = await apiRequest<any>('/api/v1/orders', {
+  const result = await apiRequest<any>('/api/v1/public/orders', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -201,7 +202,8 @@ export const updateOrderStatusViaApi = async (orderId: string, status: OrderStat
 };
 
 export const fetchRestaurantRequests = async (restaurantId: string) => {
-  const data = await apiRequest<any[]>(`/api/v1/requests?restaurant_id=${encodeURIComponent(restaurantId)}`);
+  const payload = await apiRequest<any>(`/api/v1/requests?restaurant_id=${encodeURIComponent(restaurantId)}`);
+  const data = payload?.data ?? payload;
   return (data || []).map(normalizeServiceRequest);
 };
 

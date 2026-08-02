@@ -294,6 +294,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         cart={cart}
         restaurantId={restaurantId}
         tableId={activeTable.id}
+        menuItems={menuItems}
         onUpdateQuantity={handleUpdateCartQuantity}
         onClearCart={() => setCart([])}
         onOrderPlaced={() => {

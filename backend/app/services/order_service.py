@@ -22,7 +22,7 @@ class OrderService:
         self.restaurant_repo = RestaurantRepository(session)
 
     async def create_order(self, request: OrderCreateRequest) -> Order:
-        restaurant = await self.restaurant_repo.get_by_id(request.restaurant_id)
+        restaurant = await self.restaurant_repo.get_by_identifier(request.restaurant_id)
         if not restaurant or not restaurant.is_active:
             raise NotFoundException("Restaurant", request.restaurant_id)
 
@@ -156,4 +156,7 @@ class OrderService:
         return order
 
     async def get_active_orders(self, restaurant_id: str) -> List[Order]:
-        return await self.order_repo.get_active_orders_for_restaurant(restaurant_id)
+        restaurant = await self.restaurant_repo.get_by_identifier(restaurant_id)
+        if not restaurant:
+            return []
+        return await self.order_repo.get_active_orders_for_restaurant(restaurant.id)

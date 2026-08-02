@@ -25,6 +25,7 @@ python-dotenv>=1.0.1,<1.1.0
 qrcode[pil]>=7.4.2,<8.0.0
 Pillow>=10.3.0,<11.0.0
 httpx>=0.27.0,<0.28.0
+email-validator>=2.2.0,<3.0.0
 
 # Cloud Media Storage (Optional)
 cloudinary>=1.40.0,<1.42.0

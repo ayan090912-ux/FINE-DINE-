@@ -63,7 +63,7 @@ class EmployeeService:
             },
         )
         await manager.broadcast_to_restaurant(data.restaurant_id, payload.model_dump())
-        return created
+        return await self.enrich_employee_metrics(created)
 
     async def enrich_employee_metrics(self, emp: Employee) -> Employee:
         """Enriches an Employee model instance with attendance metrics and performance stats for API response."""

@@ -169,16 +169,16 @@ export const EmployeeManager: React.FC = () => {
       if (editingEmployee) {
         // Edit flow
         const updatePayload: any = {
-          full_name: formData.fullName,
+          full_name: formData.fullName.trim(),
           role: formData.role,
-          position: formData.position,
+          position: formData.position.trim(),
           username: formData.username.trim(),
-          phone_number: formData.phoneNumber,
-          email: formData.email,
-          address: formData.address,
-          date_of_birth: formData.dateOfBirth || null,
+          phone_number: formData.phoneNumber.trim() || null,
+          email: formData.email.trim() || null,
+          address: formData.address.trim() || null,
+          date_of_birth: formData.dateOfBirth ? formData.dateOfBirth.trim() : null,
           shift: formData.shift,
-          notes: formData.notes,
+          notes: formData.notes.trim() || null,
         };
         if (formData.password.trim()) {
           updatePayload.password = formData.password.trim();
@@ -202,17 +202,17 @@ export const EmployeeManager: React.FC = () => {
         if (!formData.password) throw new Error('Password is required.');
 
         const created = await addEmployee({
-          full_name: formData.fullName,
+          full_name: formData.fullName.trim(),
           role: formData.role,
-          position: formData.position,
+          position: formData.position.trim(),
           username: formData.username.trim(),
           password: formData.password.trim(),
-          phone_number: formData.phoneNumber || null,
-          email: formData.email || null,
-          address: formData.address || null,
-          date_of_birth: formData.dateOfBirth || null,
+          phone_number: formData.phoneNumber.trim() || null,
+          email: formData.email.trim() || null,
+          address: formData.address.trim() || null,
+          date_of_birth: formData.dateOfBirth ? formData.dateOfBirth.trim() : null,
           shift: formData.shift,
-          notes: formData.notes || null,
+          notes: formData.notes.trim() || null,
         });
 
         if (photoFile && created.id) {

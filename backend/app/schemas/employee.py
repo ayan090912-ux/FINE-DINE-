@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.models.enums import EmployeeOnlineStatus, EmployeeShift, EmploymentStatus, UserRole
 
 
@@ -19,6 +19,25 @@ class EmployeeCreate(BaseModel):
     shift: EmployeeShift = Field(default=EmployeeShift.FULL_TIME)
     notes: Optional[str] = None
 
+    @field_validator("date_of_birth", mode="before")
+    def parse_date_of_birth(cls, v: Any) -> Optional[date]:
+        if v is None or v == "" or (isinstance(v, str) and not v.strip()):
+            return None
+        if isinstance(v, date):
+            return v
+        if isinstance(v, str):
+            try:
+                return datetime.strptime(v.strip(), "%Y-%m-%d").date()
+            except ValueError:
+                return None
+        return None
+
+    @field_validator("photo_url", "phone_number", "email", "address", "notes", mode="before")
+    def clean_empty_strings(cls, v: Any) -> Optional[str]:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return str(v).strip()
+
 
 class EmployeeUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -34,6 +53,25 @@ class EmployeeUpdate(BaseModel):
     shift: Optional[EmployeeShift] = None
     employment_status: Optional[EmploymentStatus] = None
     notes: Optional[str] = None
+
+    @field_validator("date_of_birth", mode="before")
+    def parse_date_of_birth(cls, v: Any) -> Optional[date]:
+        if v is None or v == "" or (isinstance(v, str) and not v.strip()):
+            return None
+        if isinstance(v, date):
+            return v
+        if isinstance(v, str):
+            try:
+                return datetime.strptime(v.strip(), "%Y-%m-%d").date()
+            except ValueError:
+                return None
+        return None
+
+    @field_validator("photo_url", "phone_number", "email", "address", "notes", mode="before")
+    def clean_empty_strings(cls, v: Any) -> Optional[str]:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return str(v).strip()
 
 
 class EmployeePasswordReset(BaseModel):

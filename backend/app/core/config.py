@@ -43,19 +43,48 @@ class Settings(BaseSettings):
 
     # CORS Allowed Origins
     ALLOWED_ORIGINS: Union[str, List[str]] = [
+        "https://fine-dine-nu.vercel.app",
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:4173",
         "http://localhost:8000",
-        "*"
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:4173",
+        "http://127.0.0.1:8000",
     ]
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     def parse_allowed_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",") if i.strip()]
+        default_origins = [
+            "https://fine-dine-nu.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:4173",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:4173",
+            "http://127.0.0.1:8000",
+        ]
+        if isinstance(v, str):
+            if not v.startswith("["):
+                origins = [i.strip() for i in v.split(",") if i.strip()]
+            else:
+                import json
+                try:
+                    origins = json.loads(v)
+                except Exception:
+                    origins = default_origins
         elif isinstance(v, list):
-            return v
-        return ["*"]
+            origins = v
+        else:
+            origins = default_origins
+
+        out = set(origins)
+        out.update(default_origins)
+        out.discard("*")
+        return list(out)
 
     # Cloudinary Config
     CLOUDINARY_CLOUD_NAME: str = ""

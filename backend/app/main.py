@@ -67,15 +67,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Mount Static Files for Employee Photo Uploads
 import os
 from fastapi.staticfiles import StaticFiles
@@ -83,10 +74,21 @@ uploads_dir = os.path.join(os.getcwd(), "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-# Custom Middlewares
+# Custom Middlewares (added first so CORSMiddleware wraps them)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(TenantIsolationMiddleware)
 app.add_middleware(AuditLogMiddleware)
+
+# CORS Configuration (added LAST so it is the outermost middleware processing requests & responses)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 
 # Custom Global Exception Handler

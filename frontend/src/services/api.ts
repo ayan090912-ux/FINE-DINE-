@@ -1,15 +1,44 @@
 import { Category, MenuItem, Order, OrderStatus, ServiceRequest, ServiceRequestType, ServiceRequestStatus, Table, TableSection, TableStatus, Employee } from '../types';
 
-const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const getApiBaseUrl = (): string => {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+    return envUrl.trim().replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return 'https://fine-dine-w585.onrender.com';
+  }
+  return 'http://localhost:8000';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+
+export const resolveMediaUrl = (url?: string | null): string => {
+  if (!url || !url.trim()) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  return `${API_BASE_URL}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+};
 
 async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
-    },
-    ...init,
-  });
+  const fullUrl = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(fullUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+      ...init,
+    });
+  } catch (err: any) {
+    const rawMsg = err?.message || 'Failed to fetch';
+    throw new Error(
+      `Network Error (${rawMsg}): Unable to connect to backend at ${API_BASE_URL}. Verify backend status & CORS settings.`
+    );
+  }
 
   let payload: any = null;
   try {
@@ -19,7 +48,15 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const detail = payload?.detail || payload?.message || 'Request failed';
+    let detail = payload?.detail || payload?.message || payload?.error;
+    if (Array.isArray(detail)) {
+      detail = detail.map((d: any) => `${d.loc ? d.loc.join('.') : 'field'}: ${d.msg}`).join(' | ');
+    } else if (typeof detail === 'object' && detail !== null) {
+      detail = JSON.stringify(detail);
+    }
+    if (!detail) {
+      detail = `HTTP Error ${response.status} (${response.statusText || 'Request failed'})`;
+    }
     throw new Error(detail);
   }
 
@@ -154,7 +191,7 @@ export const normalizeMenuItem = (raw: any): MenuItem => ({
   prepTimeMinutes: Number(raw.preparation_time_minutes || raw.prepTimeMinutes || 15),
   vegType: raw.is_veg ? 'veg' : 'non-veg',
   available: raw.is_available ?? raw.available ?? true,
-  imageUrl: raw.image_url || raw.imageUrl || '',
+  imageUrl: resolveMediaUrl(raw.image_url || raw.imageUrl),
   spicyLevel: raw.is_spicy ? 2 : 0,
 });
 
@@ -438,7 +475,6 @@ export const fetchWaiterPerformanceViaApi = async (restaurantId: string = 'dinef
   return payload?.data ?? payload;
 };
 
-// Employee Management System APIs
 export const normalizeEmployee = (raw: any): Employee => {
   const perf = raw.performance || {};
   return {
@@ -446,7 +482,7 @@ export const normalizeEmployee = (raw: any): Employee => {
     restaurantId: raw.restaurant_id,
     employeeId: raw.employee_id,
     fullName: raw.full_name,
-    photoUrl: raw.photo_url,
+    photoUrl: resolveMediaUrl(raw.photo_url),
     phoneNumber: raw.phone_number,
     email: raw.email,
     address: raw.address,
@@ -523,13 +559,25 @@ export const uploadEmployeePhotoViaApi = async (employeeId: string, file: File):
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/employees/${employeeId}/photo`, {
-    method: 'POST',
-    body: formData,
-  });
-  if (!res.ok) throw new Error('Photo upload failed');
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api/v1/employees/${employeeId}/photo`, {
+      method: 'POST',
+      body: formData,
+    });
+  } catch (err: any) {
+    throw new Error(`Photo upload network error: ${err?.message || 'Failed to fetch'}`);
+  }
+
+  if (!res.ok) {
+    let payload: any = null;
+    try { payload = await res.json(); } catch {}
+    const detail = payload?.detail || payload?.message || `Photo upload failed (HTTP ${res.status})`;
+    throw new Error(detail);
+  }
   const data = await res.json();
-  return data.photo_url;
+  const rawUrl = data.photo_url || data.employee?.photo_url || '';
+  return resolveMediaUrl(rawUrl);
 };
 
 export const authenticateEmployeeViaApi = async (data: { username: string; password: string; role?: string }): Promise<Employee> => {

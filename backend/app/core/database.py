@@ -20,51 +20,47 @@ from sqlalchemy.orm import (
 from app.core.config import settings
 
 # ==========================================================
-# DATABASE URLS
-# ==========================================================
-
-DATABASE_URL = settings.DATABASE_URL
-SYNC_DATABASE_URL = settings.SYNC_DATABASE_URL
-
-# Convert generic postgres URLs
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgresql://",
-        "postgresql+asyncpg://",
-        1,
-    )
-
-if SYNC_DATABASE_URL.startswith("postgresql://"):
-    SYNC_DATABASE_URL = SYNC_DATABASE_URL.replace(
-        "postgresql://",
-        "postgresql+psycopg2://",
-        1,
-    )
-
-
-# ==========================================================
-# Remove unsupported asyncpg parameters
+# DATABASE URL CLEANING & FORMATTING
 # ==========================================================
 
 def clean_asyncpg_url(url: str) -> str:
+    """Strip query parameters unsupported by asyncpg driver (e.g. sslmode, channel_binding)."""
     parsed = urlparse(url)
-
     query = dict(parse_qsl(parsed.query))
-
     query.pop("sslmode", None)
     query.pop("channel_binding", None)
-
     return urlunparse(parsed._replace(query=urlencode(query)))
 
 
-if DATABASE_URL.startswith("postgresql+asyncpg://"):
-    DATABASE_URL = clean_asyncpg_url(DATABASE_URL)
+def format_database_urls(raw_async_url: str, raw_sync_url: str):
+    async_url = raw_async_url or "sqlite+aiosqlite:///./dineflow.db"
+    
+    # Format Postgres scheme for asyncpg
+    if async_url.startswith("postgres://"):
+        async_url = async_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif async_url.startswith("postgresql://"):
+        async_url = async_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    if async_url.startswith("postgresql+asyncpg://"):
+        async_url = clean_asyncpg_url(async_url)
+
+    # Format Sync URL for psycopg2 / alembic
+    sync_url = raw_sync_url or ""
+    if (not sync_url or "sqlite" in sync_url) and "postgresql" in async_url:
+        sync_url = async_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    elif sync_url.startswith("postgres://"):
+        sync_url = sync_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif sync_url.startswith("postgresql://"):
+        sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    elif sync_url.startswith("postgresql+asyncpg://"):
+        sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    elif not sync_url:
+        sync_url = "sqlite:///./dineflow.db"
+
+    return async_url, sync_url
 
 
-print("=" * 80)
-print("ASYNC DATABASE :", DATABASE_URL)
-print("SYNC DATABASE  :", SYNC_DATABASE_URL)
-print("=" * 80)
+DATABASE_URL, SYNC_DATABASE_URL = format_database_urls(settings.DATABASE_URL, settings.SYNC_DATABASE_URL)
 
 
 # ==========================================================
@@ -74,7 +70,6 @@ print("=" * 80)
 is_sqlite = DATABASE_URL.startswith("sqlite")
 
 if is_sqlite:
-
     async_engine = create_async_engine(
         DATABASE_URL,
         echo=settings.DEBUG,
@@ -91,12 +86,8 @@ if is_sqlite:
             "check_same_thread": False,
         },
     )
-
 else:
-
     connect_args = {}
-
-    # Enable SSL only for Neon
     if "neon.tech" in DATABASE_URL:
         connect_args["ssl"] = "require"
 

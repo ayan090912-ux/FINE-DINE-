@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { authenticateEmployeeViaApi } from '../../services/api';
+
 interface LoginViewProps {
   role: 'owner' | 'kitchen' | 'waiter';
   onSuccess: () => void;
@@ -28,6 +30,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ role, onSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // Password Reset Modal State
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -42,29 +45,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ role, onSuccess }) => {
       title: 'Owner Portal Access',
       subtitle: 'Manage restaurant operations, analytics & settings',
       icon: ShieldCheck,
-      defaultUser: ownerUsername || 'owner',
-      defaultPass: ownerPassword || 'owner123',
       color: 'from-amber-500 to-amber-700',
     },
     kitchen: {
       title: 'Kitchen Display System (KDS)',
       subtitle: 'Live cooking queue, order management & ETAs',
       icon: ChefHat,
-      defaultUser: 'chef',
-      defaultPass: 'chef123',
       color: 'from-orange-500 to-orange-700',
     },
     waiter: {
       title: 'Waiter Service Terminal',
       subtitle: 'Live order dispatches & table requests',
       icon: BellRing,
-      defaultUser: 'waiter',
-      defaultPass: 'waiter123',
       color: 'from-emerald-500 to-emerald-700',
     },
   }[role];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!username.trim()) {
@@ -76,13 +73,30 @@ export const LoginView: React.FC<LoginViewProps> = ({ role, onSuccess }) => {
       return;
     }
 
-    const res = login(role, username, password);
-    if (!res.success) {
-      setError(res.error || 'Authentication failed. Please verify your credentials.');
-      return;
-    }
+    setIsAuthenticating(true);
+    try {
+      let empProfile: any = null;
+      if (role === 'waiter' || role === 'kitchen') {
+        try {
+          empProfile = await authenticateEmployeeViaApi({ username: username.trim(), password, role: role.toUpperCase() });
+        } catch (apiErr: any) {
+          setError(apiErr.message || 'Authentication failed. Please verify your username and password.');
+          return;
+        }
+      }
 
-    onSuccess();
+      const res = login(role, username, password, empProfile);
+      if (!res.success) {
+        setError(res.error || 'Authentication failed. Please verify your credentials.');
+        return;
+      }
+
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Authentication error occurred.');
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   const handleResetPassword = (e: React.FormEvent) => {
@@ -166,7 +180,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ role, onSuccess }) => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={`e.g. ${config.defaultUser}`}
+                placeholder="Enter username..."
                 className="w-full bg-zinc-950 border border-zinc-800 focus:border-amber-500/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none transition"
               />
             </div>
@@ -201,31 +215,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ role, onSuccess }) => {
 
           <button
             type="submit"
-            className="w-full mt-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-amber-500/10 transition cursor-pointer"
+            disabled={isAuthenticating}
+            className="w-full mt-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-amber-500/10 transition cursor-pointer disabled:opacity-50"
           >
-            <span>Authenticate Access</span>
+            <span>{isAuthenticating ? 'Authenticating...' : 'Sign In'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-zinc-800/80 text-center space-y-2">
-          <button
-            onClick={() => {
-              setUsername(config.defaultUser);
-              setPassword(config.defaultPass);
-            }}
-            className="text-xs text-zinc-400 hover:text-amber-400 flex items-center justify-center gap-1.5 mx-auto transition cursor-pointer"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-            <span>Fill Saved Credentials ({config.defaultUser} / {config.defaultPass})</span>
-          </button>
-          
-          {role === 'owner' && (
+        {role === 'owner' && (
+          <div className="mt-4 pt-4 border-t border-zinc-800/80 text-center">
             <p className="text-[11px] text-zinc-500">
               Unique Security Reset Code: <span className="font-mono text-amber-400 font-bold">{ownerSecurityCode}</span>
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Reset Password Modal with Unique Code */}

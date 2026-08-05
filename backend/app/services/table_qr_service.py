@@ -6,6 +6,8 @@ from app.models.table import Table
 from app.repositories.restaurant import RestaurantRepository
 from app.repositories.table import QRCodeRepository, TableRepository
 from app.schemas.table import TableCreate, TableScanResolution, TableUpdate
+from app.websockets.connection_manager import ws_manager
+from app.websockets.events import WSEventType
 
 
 class TableQRService:
@@ -14,6 +16,14 @@ class TableQRService:
         self.table_repo = TableRepository(session)
         self.qr_repo = QRCodeRepository(session)
         self.restaurant_repo = RestaurantRepository(session)
+
+    async def _notify_table_update(self, restaurant_id: str):
+        event = {
+            "event_type": WSEventType.TABLE_UPDATED,
+            "restaurant_id": restaurant_id,
+            "data": {"timestamp": True}
+        }
+        await ws_manager.broadcast_to_restaurant(restaurant_id, event)
 
     async def create_table(self, restaurant_id: str, data: TableCreate) -> Table:
         table_data = data.model_dump()
@@ -31,7 +41,9 @@ class TableQRService:
             "is_active": True
         })
 
-        return await self.table_repo.get_with_qr(table.id)
+        res = await self.table_repo.get_with_qr(table.id)
+        await self._notify_table_update(restaurant_id)
+        return res
 
     async def get_tables_for_restaurant(self, restaurant_id: str) -> List[Table]:
         return await self.table_repo.get_all(filters={"restaurant_id": restaurant_id})
@@ -41,7 +53,17 @@ class TableQRService:
         if not table:
             raise NotFoundException("Table", table_id)
         await self.table_repo.update(table, data.model_dump(exclude_unset=True))
-        return await self.table_repo.get_with_qr(table_id)
+        res = await self.table_repo.get_with_qr(table_id)
+        await self._notify_table_update(table.restaurant_id)
+        return res
+
+    async def delete_table(self, table_id: str) -> bool:
+        table = await self.table_repo.get_by_id(table_id)
+        if not table:
+            return False
+        res = await self.table_repo.soft_delete(table_id)
+        await self._notify_table_update(table.restaurant_id)
+        return res
 
     async def resolve_qr_scan(self, code_hash: str) -> TableScanResolution:
         qr = await self.qr_repo.get_by_code_hash(code_hash)
@@ -52,6 +74,10 @@ class TableQRService:
         if not restaurant or not restaurant.is_active:
             raise NotFoundException("Restaurant", qr.restaurant_id)
 
+        from app.services.session_service import SessionService
+        session_service = SessionService(self.session)
+        dining_session = await session_service.get_or_create_active_session(restaurant.id, qr.table.id)
+
         return TableScanResolution(
             restaurant_id=restaurant.id,
             restaurant_name=restaurant.name,
@@ -60,5 +86,8 @@ class TableQRService:
             currency=restaurant.currency,
             table_id=qr.table.id,
             table_number=qr.table.table_number,
-            section=qr.table.section
+            section=qr.table.section,
+            status=qr.table.status.value if hasattr(qr.table.status, 'value') else str(qr.table.status),
+            session_id=dining_session.id,
+            session_code=dining_session.session_code,
         )

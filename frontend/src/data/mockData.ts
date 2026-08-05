@@ -131,14 +131,14 @@ export const initialMenuItems: MenuItem[] = [
 ];
 
 export const initialTables: Table[] = [
-  { id: 't-1', tableNumber: '01', name: 'Main Hall Window', capacity: 2, section: 'Indoor', isActive: true, isOccupied: false },
-  { id: 't-2', tableNumber: '02', name: 'Main Hall Center', capacity: 4, section: 'Indoor', isActive: true, isOccupied: false },
-  { id: 't-3', tableNumber: '03', name: 'Main Hall Corner', capacity: 4, section: 'Indoor', isActive: true, isOccupied: false },
-  { id: 't-4', tableNumber: '04', name: 'Garden Terrace 1', capacity: 6, section: 'Outdoor', isActive: true, isOccupied: true },
-  { id: 't-5', tableNumber: '05', name: 'Garden Terrace 2', capacity: 4, section: 'Outdoor', isActive: true, isOccupied: false },
-  { id: 't-6', tableNumber: '06', name: 'VIP Lounge Alpha', capacity: 8, section: 'VIP', isActive: true, isOccupied: false },
-  { id: 't-7', tableNumber: '07', name: 'Rooftop Cabana 1', capacity: 4, section: 'Rooftop', isActive: true, isOccupied: false },
-  { id: 't-8', tableNumber: '08', name: 'Rooftop Cabana 2', capacity: 6, section: 'Rooftop', isActive: true, isOccupied: false },
+  { id: 't-1', tableNumber: '01', name: 'Main Hall Window', capacity: 2, section: 'Indoor', status: 'VACANT', isActive: true, isOccupied: false },
+  { id: 't-2', tableNumber: '02', name: 'Main Hall Center', capacity: 4, section: 'Indoor', status: 'VACANT', isActive: true, isOccupied: false },
+  { id: 't-3', tableNumber: '03', name: 'Main Hall Corner', capacity: 4, section: 'Indoor', status: 'VACANT', isActive: true, isOccupied: false },
+  { id: 't-4', tableNumber: '04', name: 'Garden Terrace 1', capacity: 6, section: 'Outdoor', status: 'OCCUPIED', isActive: true, isOccupied: true },
+  { id: 't-5', tableNumber: '05', name: 'Garden Terrace 2', capacity: 4, section: 'Outdoor', status: 'VACANT', isActive: true, isOccupied: false },
+  { id: 't-6', tableNumber: '06', name: 'VIP Lounge Alpha', capacity: 8, section: 'VIP', status: 'VACANT', isActive: true, isOccupied: false },
+  { id: 't-7', tableNumber: '07', name: 'Rooftop Cabana 1', capacity: 4, section: 'Rooftop', status: 'VACANT', isActive: true, isOccupied: false },
+  { id: 't-8', tableNumber: '08', name: 'Rooftop Cabana 2', capacity: 6, section: 'Rooftop', status: 'VACANT', isActive: true, isOccupied: false },
 ];
 
 export const initialPromotions: Promotion[] = [
@@ -182,7 +182,7 @@ export const initialPromotions: Promotion[] = [
 ];
 
 export const initialRestaurantSettings: RestaurantSettings = {
-  id: 'rest-dineflow',
+  id: 'dineflow',
   name: 'DINEFLOW OPUS',
   tagline: 'Artisanal Dining & Modern Gastronomy',
   logoUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=200',

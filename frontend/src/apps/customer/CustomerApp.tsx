@@ -8,8 +8,7 @@ import { CartDrawer, CartItem } from './CartDrawer';
 import { OrderTrackerModal } from './OrderTrackerModal';
 import { CallWaiterModal } from './CallWaiterModal';
 import { FeedbackModal } from './FeedbackModal';
-import { Search, Utensils, Filter } from 'lucide-react';
-import { fetchPublicMenu, fetchRestaurantOrders } from '../../services/api';
+import { Search, Utensils, Filter, Clock, CheckCircle2 } from 'lucide-react';
 
 interface CustomerAppProps {
   restaurantId: string;
@@ -20,10 +19,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   restaurantId,
   tableId,
 }) => {
-  const { tables, settings } = useStore();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { tables, settings, categories, menuItems, orders, serviceRequests = [], employees = [], refreshData } = useStore();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,7 +43,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
   // Active orders placed by this table
   const activeOrders = orders.filter(
-    (o) => (o.tableId === tableId || o.tableNumber === tableId) && o.status !== 'completed' && o.status !== 'cancelled'
+    (o) => (o.tableId === tableId || o.tableName.includes(tableId) || o.tableId.includes(tableId)) && o.status !== 'completed' && o.status !== 'cancelled'
   );
 
   // Cart operations
@@ -76,33 +72,6 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   };
 
   const cartCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      try {
-        const [menuData, orderData] = await Promise.all([
-          fetchPublicMenu(restaurantId),
-          fetchRestaurantOrders(restaurantId),
-        ]);
-
-        if (!isMounted) return;
-        setCategories(menuData.categories);
-        setMenuItems(menuData.menuItems);
-        setOrders(orderData);
-      } catch (error) {
-        console.error('Unable to load customer menu or orders', error);
-      }
-    };
-
-    loadData();
-    const intervalId = window.setInterval(loadData, 10000);
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [restaurantId]);
 
   // Menu filtering
   const filteredMenuItems = menuItems.filter((item) => {
@@ -135,6 +104,60 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       />
 
       <main className="max-w-4xl mx-auto w-full px-4 pt-4 flex-1 space-y-5">
+        {/* Service Request Dispatch Status Banner */}
+        {(() => {
+          const activeTableReqs = serviceRequests.filter((r) => r.tableId === activeTable.id && r.status !== 'archived');
+          const latestReq = activeTableReqs[0];
+          if (!latestReq) return null;
+
+          if (latestReq.status === 'pending') {
+            return (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 animate-spin">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-300">Waiting for a waiter...</p>
+                    <p className="text-[11px] text-zinc-400">Request: <span className="capitalize">{latestReq.type.replace('_', ' ')}</span></p>
+                  </div>
+                </div>
+              </div>
+            );
+          } else if (latestReq.status === 'accepted' || latestReq.status === 'in_progress') {
+            return (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-300">A waiter has accepted your request.</p>
+                    <p className="text-[11px] text-zinc-400">
+                      Assigned: <span className="font-bold text-white">{latestReq.assignedWaiterName || 'Floor Staff'}</span> is attending to your table.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          } else if (latestReq.status === 'completed') {
+            return (
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-blue-300">Your request has been completed.</p>
+                    <p className="text-[11px] text-zinc-400">Thank you for dining with us!</p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         {/* Active Order Banner if orders exist */}
         {activeOrders.length > 0 && (
           <div
@@ -299,7 +322,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         onClearCart={() => setCart([])}
         onOrderPlaced={() => {
           setIsOrdersOpen(true);
-          fetchRestaurantOrders(restaurantId).then(setOrders).catch(console.error);
+          refreshData();
         }}
       />
 

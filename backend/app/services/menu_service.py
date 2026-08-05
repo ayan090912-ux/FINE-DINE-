@@ -5,6 +5,8 @@ from app.models.menu import Category, MenuItem
 from app.repositories.menu import CategoryRepository, MenuItemRepository
 from app.repositories.restaurant import RestaurantRepository
 from app.schemas.menu import CategoryCreate, CategoryUpdate, MenuItemCreate, MenuItemUpdate, PublicMenuResponse
+from app.websockets.connection_manager import ws_manager
+from app.websockets.events import WSEventType
 
 
 class MenuService:
@@ -14,19 +16,39 @@ class MenuService:
         self.item_repo = MenuItemRepository(session)
         self.restaurant_repo = RestaurantRepository(session)
 
+    async def _notify_menu_update(self, restaurant_id: str):
+        event = {
+            "event_type": WSEventType.MENU_UPDATED,
+            "restaurant_id": restaurant_id,
+            "data": {"timestamp": True}
+        }
+        await ws_manager.broadcast_to_restaurant(restaurant_id, event)
+
+    async def get_categories(self, restaurant_id: str) -> List[Category]:
+        return await self.category_repo.get_all(filters={"restaurant_id": restaurant_id})
+
     async def create_category(self, restaurant_id: str, data: CategoryCreate) -> Category:
         category_data = data.model_dump()
         category_data["restaurant_id"] = restaurant_id
-        return await self.category_repo.create(category_data)
+        category = await self.category_repo.create(category_data)
+        await self._notify_menu_update(restaurant_id)
+        return category
 
     async def update_category(self, category_id: str, data: CategoryUpdate) -> Category:
         category = await self.category_repo.get_by_id(category_id)
         if not category:
             raise NotFoundException("Category", category_id)
-        return await self.category_repo.update(category, data.model_dump(exclude_unset=True))
+        updated = await self.category_repo.update(category, data.model_dump(exclude_unset=True))
+        await self._notify_menu_update(category.restaurant_id)
+        return updated
 
     async def delete_category(self, category_id: str) -> bool:
-        return await self.category_repo.soft_delete(category_id)
+        category = await self.category_repo.get_by_id(category_id)
+        if not category:
+            return False
+        res = await self.category_repo.soft_delete(category_id)
+        await self._notify_menu_update(category.restaurant_id)
+        return res
 
     async def create_menu_item(self, restaurant_id: str, data: MenuItemCreate) -> MenuItem:
         item_data = data.model_dump(exclude={"variants", "addons"})
@@ -48,24 +70,33 @@ class MenuService:
                 self.session.add(a_obj)
 
         await self.session.flush()
-        return await self.item_repo.get_with_details(menu_item.id)
+        item = await self.item_repo.get_with_details(menu_item.id)
+        await self._notify_menu_update(restaurant_id)
+        return item
 
     async def update_menu_item(self, item_id: str, data: MenuItemUpdate) -> MenuItem:
         item = await self.item_repo.get_by_id(item_id)
         if not item:
             raise NotFoundException("MenuItem", item_id)
         await self.item_repo.update(item, data.model_dump(exclude_unset=True))
-        return await self.item_repo.get_with_details(item_id)
+        updated_item = await self.item_repo.get_with_details(item_id)
+        await self._notify_menu_update(item.restaurant_id)
+        return updated_item
 
     async def delete_menu_item(self, item_id: str) -> bool:
-        return await self.item_repo.soft_delete(item_id)
+        item = await self.item_repo.get_by_id(item_id)
+        if not item:
+            return False
+        res = await self.item_repo.soft_delete(item_id)
+        await self._notify_menu_update(item.restaurant_id)
+        return res
 
     async def get_public_menu(self, restaurant_id: str) -> PublicMenuResponse:
         restaurant = await self.restaurant_repo.get_by_identifier(restaurant_id)
         if not restaurant or not restaurant.is_active:
             raise NotFoundException("Restaurant", restaurant_id)
 
-        categories = await self.category_repo.get_menu_for_restaurant(restaurant_id)
+        categories = await self.category_repo.get_menu_for_restaurant(restaurant.id)
 
         return PublicMenuResponse(
             restaurant_id=restaurant.id,

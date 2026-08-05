@@ -1,10 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
-from app.models.enums import UserRole
-from app.models.user import User
 from app.schemas.common import APIResponse
 from app.schemas.order import OrderCreateRequest, OrderResponse, OrderStatusUpdate
 from app.services.order_service import OrderService
@@ -25,26 +22,23 @@ async def create_order(
 
 @router.get("", response_model=APIResponse[List[OrderResponse]])
 async def list_orders(
-    restaurant_id: Optional[str] = Query(default=None),
+    restaurant_id: Optional[str] = Query(default="dineflow"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Retrieve active orders for a restaurant without requiring staff login."""
+    """Retrieve active orders for a restaurant."""
     service = OrderService(db)
-    if restaurant_id:
-        orders = await service.get_active_orders(restaurant_id)
-    else:
-        orders = []
+    orders = await service.get_active_orders(restaurant_id or "dineflow")
     return APIResponse(message="Active orders retrieved.", data=orders)
 
 
 @router.get("/active", response_model=APIResponse[List[OrderResponse]])
 async def get_active_orders(
-    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.MANAGER, UserRole.KITCHEN, UserRole.WAITER, UserRole.CASHIER])),
+    restaurant_id: Optional[str] = Query(default="dineflow"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Retrieve all live/active orders for the restaurant kitchen display and staff."""
+    """Retrieve all live/active orders for the kitchen display and staff terminals."""
     service = OrderService(db)
-    orders = await service.get_active_orders(current_user.restaurant_id)
+    orders = await service.get_active_orders(restaurant_id or "dineflow")
     return APIResponse(message="Active orders retrieved.", data=orders)
 
 
@@ -52,7 +46,6 @@ async def get_active_orders(
 async def update_order_status(
     order_id: str,
     data: OrderStatusUpdate,
-    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.MANAGER, UserRole.KITCHEN, UserRole.WAITER, UserRole.CASHIER])),
     db: AsyncSession = Depends(get_db)
 ):
     """Update order status (PENDING -> CONFIRMED -> PREPARING -> READY -> SERVED -> COMPLETED)."""

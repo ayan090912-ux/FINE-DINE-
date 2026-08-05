@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   MenuItem,
   Category,
@@ -13,6 +13,7 @@ import {
   AuthUser,
   UserRole,
   BusinessDayRecord,
+  Employee,
 } from '../types';
 import {
   initialCategories,
@@ -23,6 +24,41 @@ import {
   initialFeedbacks,
 } from '../data/mockData';
 import { soundManager } from '../utils/audio';
+import {
+  fetchPublicMenu,
+  fetchRestaurantOrders,
+  fetchRestaurantRequests,
+  fetchRestaurantTables,
+  createCategoryViaApi,
+  updateCategoryViaApi,
+  deleteCategoryViaApi,
+  createMenuItemViaApi,
+  updateMenuItemViaApi,
+  deleteMenuItemViaApi,
+  createOrderViaApi,
+  updateOrderStatusViaApi,
+  createServiceRequestViaApi,
+  updateServiceRequestStatusViaApi,
+  createTableViaApi,
+  updateTableViaApi,
+  deleteTableViaApi,
+  closeTableSessionViaApi,
+  reserveTableViaApi,
+  unreserveTableViaApi,
+  acceptServiceRequestViaApi,
+  inProgressServiceRequestViaApi,
+  completeServiceRequestViaApi,
+  fetchEmployeesViaApi,
+  createEmployeeViaApi,
+  updateEmployeeViaApi,
+  resetEmployeePasswordViaApi,
+  uploadEmployeePhotoViaApi,
+  setEmployeeOnlineStatusViaApi,
+  logoutEmployeeViaApi,
+  deleteEmployeeViaApi,
+} from '../services/api';
+
+import { realtimeWs } from '../services/websocket';
 
 interface StoreContextType {
   // Data
@@ -31,6 +67,7 @@ interface StoreContextType {
   tables: Table[];
   orders: Order[];
   serviceRequests: ServiceRequest[];
+  employees: Employee[];
   promotions: Promotion[];
   settings: RestaurantSettings;
   feedbacks: Feedback[];
@@ -44,35 +81,50 @@ interface StoreContextType {
   ownerPassword: string;
   ownerSecurityCode: string;
 
+  // Actions - Employees (EMS)
+  addEmployee: (data: any) => Promise<Employee>;
+  updateEmployee: (id: string, updates: any) => Promise<Employee>;
+  resetEmployeePassword: (id: string, newPass: string) => Promise<Employee>;
+  uploadEmployeePhoto: (id: string, file: File) => Promise<string>;
+  setEmployeeOnlineStatus: (id: string, status: string) => Promise<Employee>;
+  deleteEmployee: (id: string) => Promise<void>;
+  refreshEmployees: () => Promise<void>;
+
   // Actions - Business Day
   closeBusinessDay: (ownerPassword?: string) => { success: boolean; error?: string };
   deleteBusinessDayRecord: (recordId: string) => void;
 
   // Actions - Menu
-  addCategory: (category: Omit<Category, 'id'>) => void;
-  updateCategory: (id: string, updates: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (category: Omit<Category, 'id'>) => Promise<void>;
+  updateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 
-  addMenuItem: (item: Omit<MenuItem, 'id'>) => void;
-  updateMenuItem: (id: string, updates: Partial<MenuItem>) => void;
-  deleteMenuItem: (id: string) => void;
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<void>;
+  updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
+  deleteMenuItem: (id: string) => Promise<void>;
 
   // Actions - Tables
-  addTable: (table: Omit<Table, 'id' | 'isOccupied'>) => void;
-  updateTable: (id: string, updates: Partial<Table>) => void;
-  deleteTable: (id: string) => void;
-  mergeTables: (primaryTableId: string, secondaryTableId: string) => void;
+  addTable: (table: Omit<Table, 'id' | 'isOccupied'>) => Promise<void>;
+  updateTable: (id: string, updates: Partial<Table>) => Promise<void>;
+  deleteTable: (id: string) => Promise<void>;
+  mergeTables: (primaryTableId: string, secondaryTableId: string) => Promise<void>;
+  vacateTable: (tableId: string) => Promise<void>;
+  reserveTable: (tableId: string) => Promise<void>;
+  unreserveTable: (tableId: string) => Promise<void>;
 
   // Actions - Orders
-  createOrder: (tableId: string, items: { menuItemId: string; quantity: number; specialNotes?: string }[], promoName?: string, discountAmount?: number) => Order;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
-  updateOrderEta: (orderId: string, etaMinutes: number) => void;
-  cancelOrder: (orderId: string) => void;
+  createOrder: (tableId: string, items: { menuItemId: string; quantity: number; specialNotes?: string }[], promoName?: string, discountAmount?: number) => Promise<Order>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderEta: (orderId: string, etaMinutes: number) => Promise<void>;
+  cancelOrder: (orderId: string) => Promise<void>;
   deleteOrder: (orderId: string) => void;
 
-  // Actions - Service Requests (Waiter)
-  createServiceRequest: (tableId: string, type: ServiceRequestType, note?: string) => void;
-  fulfillServiceRequest: (requestId: string) => void;
+  // Actions - Service Requests (Waiter Dispatch)
+  createServiceRequest: (tableId: string, type: ServiceRequestType, note?: string) => Promise<void>;
+  acceptServiceRequest: (requestId: string, waiterName: string, waiterId?: string) => Promise<void>;
+  inProgressServiceRequest: (requestId: string, waiterId?: string) => Promise<void>;
+  completeServiceRequest: (requestId: string, waiterId?: string) => Promise<void>;
+  fulfillServiceRequest: (requestId: string) => Promise<void>;
 
   // Actions - Promotions
   createPromotion: (promo: Omit<Promotion, 'id'>) => void;
@@ -92,96 +144,77 @@ interface StoreContextType {
   updateOwnerUsername: (currentPass: string, newUsername: string) => { success: boolean; error?: string };
 
   // Auth
-  login: (role: UserRole, username: string, password?: string) => { success: boolean; error?: string };
+  login: (role: UserRole, username: string, password?: string, empProfile?: Partial<Employee>) => { success: boolean; error?: string };
   logout: (role: UserRole) => void;
+
+  // Data Reload
+  refreshData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
-const SYNC_CHANNEL = 'dineflow_channel_v1';
-
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load initial state from LocalStorage or mock data
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('df_categories');
-    return saved ? JSON.parse(saved) : initialCategories;
-  });
+  const restaurantId = 'dineflow';
 
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
-    const saved = localStorage.getItem('df_menu_items');
-    return saved ? JSON.parse(saved) : initialMenuItems;
-  });
-
-  const [tables, setTables] = useState<Table[]>(() => {
-    const saved = localStorage.getItem('df_tables');
-    return saved ? JSON.parse(saved) : initialTables;
-  });
-
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('df_orders');
-    if (saved) return JSON.parse(saved);
-    // Seed an initial active order for table 4 so demonstration looks active
-    return [
-      {
-        id: 'ord-101',
-        orderNumber: '#101',
-        restaurantId: 'dineflow',
-        tableId: 't-4',
-        tableName: 'Garden Terrace 1',
-        items: [
-          { id: 'oi-1', menuItemId: 'item-1', name: 'Truffle Mushroom Arancini', price: 14.50, quantity: 2, vegType: 'veg' },
-          { id: 'oi-2', menuItemId: 'item-5', name: 'Truffle & Burrata Margherita', price: 22.00, quantity: 1, vegType: 'veg' }
-        ],
-        status: 'preparing',
-        subtotal: 51.00,
-        discountAmount: 10.20,
-        appliedPromotionName: 'Happy Hour 20% Off',
-        totalAmount: 40.80,
-        createdAt: new Date(Date.now() - 600000).toISOString(),
-        acceptedAt: new Date(Date.now() - 300000).toISOString(),
-        etaMinutes: 15,
-        estimatedCompletionTime: new Date(Date.now() + 600000).toISOString(),
-      }
-    ];
-  });
-
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(() => {
-    const saved = localStorage.getItem('df_service_requests');
-    if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'sr-1',
-        restaurantId: 'dineflow',
-        tableId: 't-4',
-        tableName: 'Garden Terrace 1',
-        type: 'water',
-        status: 'pending',
-        createdAt: new Date(Date.now() - 120000).toISOString(),
-      }
-    ];
-  });
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [tables, setTables] = useState<Table[]>(initialTables);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
   const [promotions, setPromotions] = useState<Promotion[]>(() => {
     const saved = localStorage.getItem('df_promotions');
-    return saved ? JSON.parse(saved) : initialPromotions;
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return initialPromotions;
   });
 
   const [settings, setSettings] = useState<RestaurantSettings>(() => {
     const saved = localStorage.getItem('df_settings');
-    return saved ? JSON.parse(saved) : initialRestaurantSettings;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.id || parsed.id === 'rest-dineflow') {
+          parsed.id = 'dineflow';
+        }
+        return parsed;
+      } catch (e) {}
+    }
+    return initialRestaurantSettings;
   });
 
   const [feedbacks, setFeedbacks] = useState<Feedback[]>(() => {
     const saved = localStorage.getItem('df_feedbacks');
-    return saved ? JSON.parse(saved) : initialFeedbacks;
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return initialFeedbacks;
   });
 
   const [authUsers, setAuthUsers] = useState<Record<UserRole, AuthUser | null>>(() => {
     const saved = localStorage.getItem('df_auth_users');
-    return saved ? JSON.parse(saved) : { owner: null, kitchen: null, waiter: null, customer: null };
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          // Clean legacy default tokens for employee accounts
+          if (parsed.kitchen?.token?.includes('default')) parsed.kitchen = null;
+          if (parsed.waiter?.token?.includes('default')) parsed.waiter = null;
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return {
+      owner: { role: 'owner', username: 'owner', token: 'token-owner-default' },
+      kitchen: null,
+      waiter: null,
+      customer: null,
+    };
   });
 
-  // Owner Credentials & Security Code
+
   const [ownerUsername, setOwnerUsername] = useState<string>(() => {
     return localStorage.getItem('df_owner_username') || 'owner';
   });
@@ -194,13 +227,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [businessDayHistory, setBusinessDayHistory] = useState<BusinessDayRecord[]>(() => {
     const saved = localStorage.getItem('df_business_day_history');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
     return [];
   });
 
   const [archivedOrders, setArchivedOrders] = useState<Order[]>(() => {
     const saved = localStorage.getItem('df_archived_orders');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
   });
 
   const [currentDailyOrderSequence, setCurrentDailyOrderSequence] = useState<number>(() => {
@@ -208,12 +246,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? parseInt(saved, 10) : 102;
   });
 
-  // Save changes to localStorage
-  useEffect(() => { localStorage.setItem('df_categories', JSON.stringify(categories)); }, [categories]);
-  useEffect(() => { localStorage.setItem('df_menu_items', JSON.stringify(menuItems)); }, [menuItems]);
-  useEffect(() => { localStorage.setItem('df_tables', JSON.stringify(tables)); }, [tables]);
-  useEffect(() => { localStorage.setItem('df_orders', JSON.stringify(orders)); }, [orders]);
-  useEffect(() => { localStorage.setItem('df_service_requests', JSON.stringify(serviceRequests)); }, [serviceRequests]);
+  // LocalStorage persist for settings & auth
   useEffect(() => { localStorage.setItem('df_promotions', JSON.stringify(promotions)); }, [promotions]);
   useEffect(() => { localStorage.setItem('df_settings', JSON.stringify(settings)); }, [settings]);
   useEffect(() => { localStorage.setItem('df_feedbacks', JSON.stringify(feedbacks)); }, [feedbacks]);
@@ -225,238 +258,362 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => { localStorage.setItem('df_archived_orders', JSON.stringify(archivedOrders)); }, [archivedOrders]);
   useEffect(() => { localStorage.setItem('df_order_sequence', currentDailyOrderSequence.toString()); }, [currentDailyOrderSequence]);
 
-  // Sync across tabs via BroadcastChannel
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
-    const bc = new BroadcastChannel(SYNC_CHANNEL);
-
-    bc.onmessage = (event) => {
-      const { type, data } = event.data || {};
-      if (type === 'SYNC_ORDERS') {
-        setOrders(data);
-      } else if (type === 'SYNC_REQUESTS') {
-        setServiceRequests(data);
-      } else if (type === 'NEW_ORDER_ALERT') {
-        soundManager.playOrderChime();
-      } else if (type === 'NEW_SERVICE_ALERT') {
-        soundManager.playWaiterCallChime();
-      }
-    };
-
-    return () => bc.close();
-  }, []);
-
-  const broadcast = (type: string, data?: unknown) => {
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        const bc = new BroadcastChannel(SYNC_CHANNEL);
-        bc.postMessage({ type, data });
-        bc.close();
-      } catch {
-        // Ignore broadcast errors
-      }
+  // Load Menu Data from Backend API
+  const loadMenu = useCallback(async () => {
+    try {
+      const data = await fetchPublicMenu(restaurantId);
+      if (data.categories && data.categories.length > 0) setCategories(data.categories);
+      if (data.menuItems && data.menuItems.length > 0) setMenuItems(data.menuItems);
+    } catch (err) {
+      console.warn('[DineFlow Store] Backend menu fetch failed, using cached menu.', err);
     }
+  }, [restaurantId]);
+
+  // Load Orders Data from Backend API
+  const loadOrders = useCallback(async () => {
+    try {
+      const fetchedOrders = await fetchRestaurantOrders(restaurantId);
+      setOrders(fetchedOrders);
+    } catch (err) {
+      console.warn('[DineFlow Store] Backend orders fetch failed.', err);
+    }
+  }, [restaurantId]);
+
+  // Load Service Requests Data from Backend API
+  const loadRequests = useCallback(async () => {
+    try {
+      const fetchedRequests = await fetchRestaurantRequests(restaurantId);
+      setServiceRequests(fetchedRequests);
+    } catch (err) {
+      console.warn('[DineFlow Store] Backend requests fetch failed.', err);
+    }
+  }, [restaurantId]);
+
+  // Load Tables Data from Backend API
+  const loadTables = useCallback(async () => {
+    try {
+      const fetchedTables = await fetchRestaurantTables(restaurantId);
+      if (fetchedTables && fetchedTables.length > 0) setTables(fetchedTables);
+    } catch (err) {
+      console.warn('[DineFlow Store] Backend tables fetch failed.', err);
+    }
+  }, [restaurantId]);
+
+  // Load Employees Data from Backend API
+  const loadEmployees = useCallback(async () => {
+    try {
+      const fetchedEmployees = await fetchEmployeesViaApi(restaurantId);
+      setEmployees(fetchedEmployees);
+    } catch (err) {
+      console.warn('[DineFlow Store] Backend employees fetch failed.', err);
+    }
+  }, [restaurantId]);
+
+  const refreshData = useCallback(async () => {
+    await Promise.all([loadMenu(), loadOrders(), loadRequests(), loadTables(), loadEmployees()]);
+  }, [loadMenu, loadOrders, loadRequests, loadTables, loadEmployees]);
+
+  // Initial Load & Realtime WebSocket connection setup
+  useEffect(() => {
+    refreshData();
+
+    // Connect WebSocket
+    realtimeWs.connect(restaurantId);
+
+    // Subscribe to incoming WebSocket events
+    const unsubscribe = realtimeWs.subscribe((event) => {
+      const type = event.event_type;
+      if (type === 'NEW_ORDER') {
+        soundManager.playOrderChime();
+        loadOrders();
+      } else if (type === 'ORDER_STATUS_CHANGED') {
+        loadOrders();
+      } else if (type === 'CUSTOMER_REQUEST' || type === 'REQUEST_ACCEPTED' || type === 'REQUEST_IN_PROGRESS' || type === 'REQUEST_COMPLETED' || type === 'REQUEST_STATUS_CHANGED') {
+        if (type === 'CUSTOMER_REQUEST') soundManager.playWaiterCallChime();
+        loadRequests();
+      } else if (type === 'MENU_UPDATED') {
+        loadMenu();
+      } else if (type === 'TABLE_UPDATED' || type === 'SESSION_STARTED' || type === 'SESSION_UPDATED' || type === 'SESSION_CLOSED') {
+        loadTables();
+        loadOrders();
+      } else if (type === 'EMPLOYEE_ONLINE' || type === 'EMPLOYEE_OFFLINE' || type === 'EMPLOYEE_STATUS_CHANGED' || type === 'EMPLOYEE_UPDATED') {
+        loadEmployees();
+      }
+    });
+
+    // Fallback polling interval (every 8s) to ensure synchronization
+    const pollInterval = window.setInterval(() => {
+      loadOrders();
+      loadRequests();
+      loadEmployees();
+    }, 8000);
+
+    return () => {
+      unsubscribe();
+      window.clearInterval(pollInterval);
+    };
+  }, [restaurantId, refreshData, loadOrders, loadRequests, loadMenu, loadTables, loadEmployees]);
+
+  // Employee Actions
+  const addEmployee = async (data: any) => {
+    const created = await createEmployeeViaApi({ ...data, restaurant_id: restaurantId });
+    setEmployees((prev) => [created, ...prev]);
+    return created;
+  };
+
+  const updateEmployee = async (id: string, updates: any) => {
+    const updated = await updateEmployeeViaApi(id, updates);
+    setEmployees((prev) => prev.map((e) => (e.id === id ? updated : e)));
+    return updated;
+  };
+
+  const resetEmployeePassword = async (id: string, newPass: string) => {
+    const updated = await resetEmployeePasswordViaApi(id, newPass);
+    setEmployees((prev) => prev.map((e) => (e.id === id ? updated : e)));
+    return updated;
+  };
+
+  const uploadEmployeePhoto = async (id: string, file: File) => {
+    const photoUrl = await uploadEmployeePhotoViaApi(id, file);
+    setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, photoUrl } : e)));
+    return photoUrl;
+  };
+
+  const setEmployeeOnlineStatus = async (id: string, status: string) => {
+    const updated = await setEmployeeOnlineStatusViaApi(id, status);
+    setEmployees((prev) => prev.map((e) => (e.id === id ? updated : e)));
+    return updated;
+  };
+
+  const deleteEmployee = async (id: string) => {
+    await deleteEmployeeViaApi(id);
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
   };
 
   // Category Actions
-  const addCategory = (category: Omit<Category, 'id'>) => {
-    const newCat: Category = { ...category, id: `cat-${Date.now()}` };
-    setCategories((prev) => [...prev, newCat]);
+  const addCategory = async (category: Omit<Category, 'id'>) => {
+    try {
+      const created = await createCategoryViaApi(restaurantId, category);
+      setCategories((prev) => [...prev, created]);
+    } catch (err) {
+      console.error('Failed to create category on backend', err);
+      // Fallback local update
+      const newCat: Category = { ...category, id: `cat-${Date.now()}` };
+      setCategories((prev) => [...prev, newCat]);
+    }
   };
 
-  const updateCategory = (id: string, updates: Partial<Category>) => {
-    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  const updateCategory = async (id: string, updates: Partial<Category>) => {
+    try {
+      const updated = await updateCategoryViaApi(id, updates);
+      setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    } catch (err) {
+      console.error('Failed to update category on backend', err);
+      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+    }
   };
 
-  const deleteCategory = (id: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+  const deleteCategory = async (id: string) => {
+    try {
+      await deleteCategoryViaApi(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      console.error('Failed to delete category on backend', err);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+    }
   };
 
   // MenuItem Actions
-  const addMenuItem = (item: Omit<MenuItem, 'id'>) => {
-    const newItem: MenuItem = { ...item, id: `item-${Date.now()}` };
-    setMenuItems((prev) => [...prev, newItem]);
+  const addMenuItem = async (item: Omit<MenuItem, 'id'>) => {
+    try {
+      const created = await createMenuItemViaApi(restaurantId, item);
+      setMenuItems((prev) => [...prev, created]);
+    } catch (err) {
+      console.error('Failed to create menu item on backend', err);
+      const newItem: MenuItem = { ...item, id: `item-${Date.now()}` };
+      setMenuItems((prev) => [...prev, newItem]);
+    }
   };
 
-  const updateMenuItem = (id: string, updates: Partial<MenuItem>) => {
-    setMenuItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
+  const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
+    try {
+      const updated = await updateMenuItemViaApi(id, updates);
+      setMenuItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
+    } catch (err) {
+      console.error('Failed to update menu item on backend', err);
+      setMenuItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
+    }
   };
 
-  const deleteMenuItem = (id: string) => {
-    setMenuItems((prev) => prev.filter((item) => item.id !== id));
+  const deleteMenuItem = async (id: string) => {
+    try {
+      await deleteMenuItemViaApi(id);
+      setMenuItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      console.error('Failed to delete menu item on backend', err);
+      setMenuItems((prev) => prev.filter((item) => item.id !== id));
+    }
   };
 
   // Table Actions
-  const addTable = (table: Omit<Table, 'id' | 'isOccupied'>) => {
-    const newTable: Table = {
-      ...table,
-      id: `t-${Date.now()}`,
-      isOccupied: false,
-    };
-    setTables((prev) => [...prev, newTable]);
+  const addTable = async (table: Omit<Table, 'id' | 'isOccupied'>) => {
+    try {
+      const created = await createTableViaApi(restaurantId, table);
+      setTables((prev) => [...prev, created]);
+    } catch (err) {
+      console.error('Failed to create table on backend', err);
+      const newTable: Table = { ...table, id: `t-${Date.now()}`, isOccupied: false };
+      setTables((prev) => [...prev, newTable]);
+    }
   };
 
-  const updateTable = (id: string, updates: Partial<Table>) => {
-    setTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+  const updateTable = async (id: string, updates: Partial<Table>) => {
+    try {
+      const updated = await updateTableViaApi(id, updates);
+      setTables((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    } catch (err) {
+      console.error('Failed to update table on backend', err);
+      setTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    }
   };
 
-  const deleteTable = (id: string) => {
-    setTables((prev) => prev.filter((t) => t.id !== id));
+  const deleteTable = async (id: string) => {
+    try {
+      await deleteTableViaApi(id);
+      setTables((prev) => prev.filter((t) => t.id !== id));
+    } catch (err) {
+      console.error('Failed to delete table on backend', err);
+      setTables((prev) => prev.filter((t) => t.id !== id));
+    }
   };
 
-  const mergeTables = (primaryTableId: string, secondaryTableId: string) => {
-    setTables((prev) =>
-      prev.map((t) => {
-        if (t.id === secondaryTableId) {
-          return { ...t, mergedWithTableId: primaryTableId, isActive: false };
-        }
-        return t;
-      })
-    );
+  const mergeTables = async (primaryTableId: string, secondaryTableId: string) => {
+    await updateTable(secondaryTableId, { mergedWithTableId: primaryTableId, isActive: false });
   };
 
-  // Order System
-  const createOrder = (
+  const vacateTable = async (tableId: string) => {
+    try {
+      await closeTableSessionViaApi(tableId, restaurantId);
+      await Promise.all([loadTables(), loadOrders()]);
+    } catch (err) {
+      console.error('Failed to vacate table on backend', err);
+    }
+  };
+
+  const reserveTable = async (tableId: string) => {
+    try {
+      const updated = await reserveTableViaApi(tableId, restaurantId);
+      setTables((prev) => prev.map((t) => (t.id === tableId ? updated : t)));
+    } catch (err) {
+      console.error('Failed to reserve table on backend', err);
+    }
+  };
+
+  const unreserveTable = async (tableId: string) => {
+    try {
+      const updated = await unreserveTableViaApi(tableId, restaurantId);
+      setTables((prev) => prev.map((t) => (t.id === tableId ? updated : t)));
+    } catch (err) {
+      console.error('Failed to unreserve table on backend', err);
+    }
+  };
+
+  // Order System Actions
+  const createOrder = async (
     tableId: string,
     items: { menuItemId: string; quantity: number; specialNotes?: string }[],
     promoName?: string,
     discountAmount: number = 0
-  ) => {
-    const table = tables.find((t) => t.id === tableId || t.tableNumber === tableId);
-    const tableName = table ? `${table.name} (${table.tableNumber})` : `Table ${tableId}`;
-
-    const orderNumStr = `#${currentDailyOrderSequence}`;
-    setCurrentDailyOrderSequence((prev) => prev + 1);
-
-    const orderItems = items.map((i) => {
-      const menu = menuItems.find((m) => m.id === i.menuItemId);
-      return {
-        id: `oi-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        menuItemId: i.menuItemId,
-        name: menu ? menu.name : 'Custom Item',
-        price: menu ? menu.price : 0,
-        quantity: i.quantity,
-        specialNotes: i.specialNotes,
-        vegType: menu ? menu.vegType : ('veg' as const),
-      };
-    });
-
-    const subtotal = orderItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
-    const finalTotal = Math.max(0, subtotal - discountAmount);
-
-    const newOrder: Order = {
-      id: `ord-${Date.now()}`,
-      orderNumber: orderNumStr,
-      restaurantId: 'dineflow',
-      tableId: table ? table.id : tableId,
-      tableName,
-      items: orderItems,
-      status: 'received',
-      subtotal,
-      discountAmount,
-      appliedPromotionName: promoName,
-      totalAmount: finalTotal,
-      createdAt: new Date().toISOString(),
-    };
-
-    setOrders((prev) => {
-      const next = [newOrder, ...prev];
-      broadcast('SYNC_ORDERS', next);
-      broadcast('NEW_ORDER_ALERT');
-      return next;
-    });
-
-    // Mark table as occupied
-    if (table) {
-      updateTable(table.id, { isOccupied: true });
+  ): Promise<Order> => {
+    try {
+      const newOrder = await createOrderViaApi(restaurantId, tableId, items, promoName, discountAmount);
+      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
+      soundManager.playOrderChime();
+      return newOrder;
+    } catch (err) {
+      console.error('Failed to create order on backend', err);
+      throw err;
     }
-
-    soundManager.playOrderChime();
-    return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
-    setOrders((prev) => {
-      const next = prev.map((o) => {
-        if (o.id === orderId) {
-          const updates: Partial<Order> = { status };
-          if (status === 'accepted') updates.acceptedAt = new Date().toISOString();
-          if (status === 'completed' || status === 'delivered') updates.completedAt = new Date().toISOString();
-          return { ...o, ...updates };
-        }
-        return o;
-      });
-      broadcast('SYNC_ORDERS', next);
-      return next;
-    });
+  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+    try {
+      const updated = await updateOrderStatusViaApi(orderId, status);
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+    } catch (err) {
+      console.error('Failed to update order status on backend', err);
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+    }
   };
 
-  const updateOrderEta = (orderId: string, etaMinutes: number) => {
-    const estimatedCompletionTime = new Date(Date.now() + etaMinutes * 60000).toISOString();
-    setOrders((prev) => {
-      const next = prev.map((o) => {
-        if (o.id === orderId) {
-          return {
-            ...o,
-            status: 'preparing',
-            etaMinutes,
-            estimatedCompletionTime,
-            acceptedAt: o.acceptedAt || new Date().toISOString(),
-          };
-        }
-        return o;
-      });
-      broadcast('SYNC_ORDERS', next);
-      return next;
-    });
+  const updateOrderEta = async (orderId: string, etaMinutes: number) => {
+    try {
+      const updated = await updateOrderStatusViaApi(orderId, 'preparing', etaMinutes);
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+    } catch (err) {
+      console.error('Failed to update order ETA on backend', err);
+    }
   };
 
-  const cancelOrder = (orderId: string) => {
-    updateOrderStatus(orderId, 'cancelled');
+  const cancelOrder = async (orderId: string) => {
+    await updateOrderStatus(orderId, 'cancelled');
   };
 
   const deleteOrder = (orderId: string) => {
-    setOrders((prev) => {
-      const next = prev.filter((o) => o.id !== orderId);
-      broadcast('SYNC_ORDERS', next);
-      return next;
-    });
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
   };
 
-  // Service Requests (Waiter calls)
-  const createServiceRequest = (tableId: string, type: ServiceRequestType, note?: string) => {
-    const table = tables.find((t) => t.id === tableId || t.tableNumber === tableId);
-    const tableName = table ? `${table.name} (${table.tableNumber})` : `Table ${tableId}`;
-
-    const newReq: ServiceRequest = {
-      id: `sr-${Date.now()}`,
-      restaurantId: 'dineflow',
-      tableId: table ? table.id : tableId,
-      tableName,
-      type,
-      note,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-
-    setServiceRequests((prev) => {
-      const next = [newReq, ...prev];
-      broadcast('SYNC_REQUESTS', next);
-      broadcast('NEW_SERVICE_ALERT');
-      return next;
-    });
-
-    soundManager.playWaiterCallChime();
+  // Service Request Actions
+  const createServiceRequest = async (tableId: string, type: ServiceRequestType, note?: string) => {
+    try {
+      const created = await createServiceRequestViaApi(restaurantId, tableId, type, note);
+      setServiceRequests((prev) => [created, ...prev.filter((r) => r.id !== created.id)]);
+      soundManager.playWaiterCallChime();
+    } catch (err) {
+      console.error('Failed to create service request on backend', err);
+    }
   };
 
-  const fulfillServiceRequest = (requestId: string) => {
-    setServiceRequests((prev) => {
-      const next = prev.map((r) =>
-        r.id === requestId ? { ...r, status: 'fulfilled' as const, fulfilledAt: new Date().toISOString() } : r
+  const acceptServiceRequest = async (requestId: string, waiterName: string, waiterId?: string) => {
+    try {
+      const updated = await acceptServiceRequestViaApi(requestId, waiterName, waiterId);
+      setServiceRequests((prev) => prev.map((r) => (r.id === requestId ? updated : r)));
+    } catch (err) {
+      console.error('Failed to accept service request on backend', err);
+      await loadRequests();
+    }
+  };
+
+  const inProgressServiceRequest = async (requestId: string, waiterId?: string) => {
+    try {
+      const updated = await inProgressServiceRequestViaApi(requestId, waiterId);
+      setServiceRequests((prev) => prev.map((r) => (r.id === requestId ? updated : r)));
+    } catch (err) {
+      console.error('Failed to mark service request in progress', err);
+      await loadRequests();
+    }
+  };
+
+  const completeServiceRequest = async (requestId: string, waiterId?: string) => {
+    try {
+      const updated = await completeServiceRequestViaApi(requestId, waiterId);
+      setServiceRequests((prev) => prev.map((r) => (r.id === requestId ? updated : r)));
+    } catch (err) {
+      console.error('Failed to complete service request on backend', err);
+      await loadRequests();
+    }
+  };
+
+  const fulfillServiceRequest = async (requestId: string) => {
+    try {
+      const updated = await updateServiceRequestStatusViaApi(requestId);
+      setServiceRequests((prev) => prev.map((r) => (r.id === requestId ? updated : r)));
+    } catch (err) {
+      console.error('Failed to fulfill service request on backend', err);
+      setServiceRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: 'completed', completedAt: new Date().toISOString() } : r))
       );
-      broadcast('SYNC_REQUESTS', next);
-      return next;
-    });
+    }
   };
 
   // Promotion Actions
@@ -479,7 +636,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Settings & Feedback
   const updateSettings = (updates: Partial<RestaurantSettings>) => {
-    setSettings((prev) => ({ ...prev, ...updates }));
+    setSettings((prev) => ({ ...prev, ...updates, id: 'dineflow' }));
   };
 
   const submitFeedback = (feedback: Omit<Feedback, 'id' | 'createdAt'>) => {
@@ -495,7 +652,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFeedbacks((prev) => prev.filter((f) => f.id !== id));
   };
 
-  // Security & Credentials
+  // Security Credentials
   const changeOwnerPassword = (currentPass: string, newPass: string): { success: boolean; error?: string } => {
     if (currentPass !== ownerPassword) {
       return { success: false, error: 'Current password does not match.' };
@@ -585,11 +742,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setArchivedOrders((prev) => [...orders, ...prev]);
     setBusinessDayHistory((prev) => [newRecord, ...prev]);
     setOrders([]);
-    broadcast('SYNC_ORDERS', []);
     setCurrentDailyOrderSequence(1);
     setServiceRequests([]);
-    broadcast('SYNC_REQUESTS', []);
-    setTables((prev) => prev.map((t) => ({ ...t, isOccupied: false })));
 
     return { success: true };
   };
@@ -599,7 +753,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Authentication
-  const login = (role: UserRole, username: string, password?: string): { success: boolean; error?: string } => {
+  const login = (
+    role: UserRole,
+    username: string,
+    password?: string,
+    empProfile?: Partial<Employee>
+  ): { success: boolean; error?: string } => {
     const cleanUser = username.trim();
     const cleanPass = password ? password.trim() : '';
 
@@ -613,24 +772,92 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (cleanPass !== ownerPassword) {
         return { success: false, error: 'Incorrect password. Click "Reset Password with Unique Code" if forgotten.' };
       }
-    } else if (role === 'kitchen') {
-      if (cleanPass && cleanPass !== 'chef123' && cleanPass !== ownerPassword) {
-        return { success: false, error: 'Incorrect passcode for Kitchen terminal.' };
-      }
-    } else if (role === 'waiter') {
-      if (cleanPass && cleanPass !== 'waiter123' && cleanPass !== ownerPassword) {
-        return { success: false, error: 'Incorrect passcode for Waiter terminal.' };
+    } else if (role === 'waiter' || role === 'kitchen') {
+      // Find employee by username in local state if empProfile not provided
+      const targetEmp = empProfile || employees.find((e) => e.username.toLowerCase() === cleanUser.toLowerCase());
+      if (targetEmp && targetEmp.employmentStatus === 'DISABLED') {
+        return { success: false, error: 'Account is disabled. Please contact the restaurant owner.' };
       }
     }
 
+    const matchedEmp = empProfile || employees.find((e) => e.username.toLowerCase() === cleanUser.toLowerCase());
+    const empId = matchedEmp?.id;
+    const nowIso = new Date().toISOString();
+
     const token = `token-${role}-${Date.now()}`;
-    const user: AuthUser = { role, username: cleanUser, token };
-    setAuthUsers((prev) => ({ ...prev, [role]: user }));
+    const user: AuthUser = {
+      role,
+      username: cleanUser,
+      token,
+      id: empId,
+      fullName: matchedEmp?.fullName || empProfile?.fullName,
+      employeeId: matchedEmp?.employeeId || empProfile?.employeeId,
+      position: matchedEmp?.position || empProfile?.position,
+      photoUrl: matchedEmp?.photoUrl || empProfile?.photoUrl,
+    };
+
+    setAuthUsers((prev) => {
+      const updated = { ...prev, [role]: user };
+      try {
+        localStorage.setItem('df_auth_users', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    if (empId) {
+      setEmployees((prev) =>
+        prev.map((e) =>
+          e.id === empId
+            ? {
+                ...e,
+                onlineStatus: 'ONLINE',
+                lastLoginAt: nowIso,
+                currentSessionStart: nowIso,
+              }
+            : e
+        )
+      );
+      setEmployeeOnlineStatusViaApi(empId, 'ONLINE').catch(() => {});
+    }
+
     return { success: true };
   };
 
   const logout = (role: UserRole) => {
-    setAuthUsers((prev) => ({ ...prev, [role]: null }));
+    const currentAuth = authUsers[role];
+    if (currentAuth?.id) {
+      const empId = currentAuth.id;
+      const nowIso = new Date().toISOString();
+      setEmployees((prev) =>
+        prev.map((e) => {
+          if (e.id === empId) {
+            const startMs = e.currentSessionStart ? new Date(e.currentSessionStart).getTime() : Date.now();
+            const sessionMin = Math.max(1, Math.round((Date.now() - startMs) / 60000));
+            return {
+              ...e,
+              onlineStatus: 'OFFLINE',
+              lastLogoutAt: nowIso,
+              todayWorkingMinutes: (e.todayWorkingMinutes || 0) + sessionMin,
+              currentSessionStart: undefined,
+            };
+          }
+          return e;
+        })
+      );
+      logoutEmployeeViaApi(empId)
+        .then((updatedEmp) => {
+          setEmployees((prev) => prev.map((e) => (e.id === empId ? updatedEmp : e)));
+        })
+        .catch((err) => console.warn('[DineFlow Auth] Failed to sync offline status on backend:', err));
+    }
+
+    setAuthUsers((prev) => {
+      const updated = { ...prev, [role]: null };
+      try {
+        localStorage.setItem('df_auth_users', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   return (
@@ -641,6 +868,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         tables,
         orders,
         serviceRequests,
+        employees,
         promotions,
         settings,
         feedbacks,
@@ -651,6 +879,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ownerUsername,
         ownerPassword,
         ownerSecurityCode,
+        addEmployee,
+        updateEmployee,
+        resetEmployeePassword,
+        uploadEmployeePhoto,
+        setEmployeeOnlineStatus,
+        deleteEmployee,
+        refreshEmployees: loadEmployees,
         closeBusinessDay,
         deleteBusinessDayRecord,
         addCategory,
@@ -663,12 +898,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateTable,
         deleteTable,
         mergeTables,
+        vacateTable,
+        reserveTable,
+        unreserveTable,
         createOrder,
         updateOrderStatus,
         updateOrderEta,
         cancelOrder,
         deleteOrder,
         createServiceRequest,
+        acceptServiceRequest,
+        inProgressServiceRequest,
+        completeServiceRequest,
         fulfillServiceRequest,
         createPromotion,
         updatePromotion,
@@ -683,6 +924,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateOwnerUsername,
         login,
         logout,
+        refreshData,
       }}
     >
       {children}

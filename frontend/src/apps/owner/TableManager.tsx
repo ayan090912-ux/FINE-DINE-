@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Table, TableSection } from '../../types';
-import { Plus, Edit2, Trash2, X, Users, MapPin, Merge } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Users, MapPin, Merge, LogOut, BookmarkCheck, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const TableManager: React.FC = () => {
-  const { tables, addTable, updateTable, deleteTable, mergeTables } = useStore();
+  const { tables, addTable, updateTable, deleteTable, mergeTables, vacateTable, reserveTable, unreserveTable } = useStore();
 
   const [editingTable, setEditingTable] = useState<Partial<Table> | null>(null);
 
@@ -50,7 +50,7 @@ export const TableManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
         <div>
           <h3 className="text-base font-bold text-white">Dining Tables Floor Manager</h3>
-          <p className="text-xs text-zinc-400">Configure capacities, sections, and table merging</p>
+          <p className="text-xs text-zinc-400">Manage dining sessions, vacate tables, reserve seating & merging</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -94,63 +94,106 @@ export const TableManager: React.FC = () => {
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {sectionTables.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`p-4 rounded-2xl border bg-zinc-900 flex flex-col justify-between space-y-3 transition relative ${
-                      !t.isActive
-                        ? 'opacity-50 border-zinc-800'
-                        : t.isOccupied
-                        ? 'border-amber-500/50 bg-amber-950/10'
-                        : 'border-zinc-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xl font-black text-amber-400">TABLE {t.tableNumber}</span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            t.isOccupied
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                              : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                          }`}
-                        >
-                          {t.isOccupied ? 'Occupied' : 'Vacant'}
-                        </span>
+                {sectionTables.map((t) => {
+                  const status = t.status || (t.isOccupied ? 'OCCUPIED' : 'VACANT');
+                  const isOccupied = status === 'OCCUPIED';
+                  const isReserved = status === 'RESERVED';
+
+                  return (
+                    <div
+                      key={t.id}
+                      className={`p-4 rounded-2xl border bg-zinc-900 flex flex-col justify-between space-y-3 transition relative ${
+                        !t.isActive
+                          ? 'opacity-50 border-zinc-800'
+                          : isOccupied
+                          ? 'border-amber-500/50 bg-amber-950/10'
+                          : isReserved
+                          ? 'border-purple-500/50 bg-purple-950/10'
+                          : 'border-zinc-800'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xl font-black text-amber-400">TABLE {t.tableNumber}</span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isOccupied
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'
+                                : isReserved
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                                : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </div>
+                        <h5 className="text-xs font-semibold text-zinc-200 mt-1">{t.name}</h5>
+                        <div className="flex items-center gap-1 text-[11px] text-zinc-400 mt-2">
+                          <Users className="w-3.5 h-3.5 text-zinc-500" />
+                          <span>Capacity: {t.capacity} Guests</span>
+                        </div>
                       </div>
-                      <h5 className="text-xs font-semibold text-zinc-200 mt-1">{t.name}</h5>
-                      <div className="flex items-center gap-1 text-[11px] text-zinc-400 mt-2">
-                        <Users className="w-3.5 h-3.5 text-zinc-500" />
-                        <span>Capacity: {t.capacity} Guests</span>
+
+                      {/* Session Actions */}
+                      <div className="pt-2 border-t border-zinc-800/80 space-y-2">
+                        {isOccupied && (
+                          <button
+                            onClick={() => vacateTable(t.id)}
+                            className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-bold py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-rose-500/30 transition"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>Vacate Table</span>
+                          </button>
+                        )}
+
+                        {!isOccupied && !isReserved && (
+                          <button
+                            onClick={() => reserveTable(t.id)}
+                            className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-purple-500/30 transition"
+                          >
+                            <BookmarkCheck className="w-3.5 h-3.5" />
+                            <span>Reserve Table</span>
+                          </button>
+                        )}
+
+                        {isReserved && (
+                          <button
+                            onClick={() => unreserveTable(t.id)}
+                            className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 font-bold py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-emerald-500/30 transition"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Unreserve Table</span>
+                          </button>
+                        )}
+
+                        {/* Edit & Delete Controls */}
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <button
+                            onClick={() => updateTable(t.id, { isActive: !t.isActive })}
+                            className="text-zinc-400 hover:text-white font-medium"
+                          >
+                            {t.isActive ? 'Deactivate' : 'Activate'}
+                          </button>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setEditingTable(t)}
+                              className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteTable(t.id)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Actions */}
-                    <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs">
-                      <button
-                        onClick={() => updateTable(t.id, { isActive: !t.isActive })}
-                        className="text-zinc-400 hover:text-white font-medium"
-                      >
-                        {t.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setEditingTable(t)}
-                          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deleteTable(t.id)}
-                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

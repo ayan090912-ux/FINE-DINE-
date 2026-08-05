@@ -10,6 +10,19 @@ class UserRole(str, enum.Enum):
     CASHIER = "CASHIER"
 
 
+class TableStatus(str, enum.Enum):
+    VACANT = "VACANT"
+    OCCUPIED = "OCCUPIED"
+    RESERVED = "RESERVED"
+
+
+class SessionStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    BILL_REQUESTED = "BILL_REQUESTED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
 class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     CONFIRMED = "CONFIRMED"
@@ -51,6 +64,10 @@ class RequestType(str, enum.Enum):
 
 class RequestStatus(str, enum.Enum):
     PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    ARCHIVED = "ARCHIVED"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     RESOLVED = "RESOLVED"
     CANCELLED = "CANCELLED"
@@ -72,4 +89,24 @@ class SubscriptionStatus(str, enum.Enum):
 
 class DiscountType(str, enum.Enum):
     PERCENTAGE = "PERCENTAGE"
-    FLAT = "FLAT"
+    FIXED_AMOUNT = "FIXED_AMOUNT"
+
+
+class EmploymentStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    DISABLED = "DISABLED"
+    ON_LEAVE = "ON_LEAVE"
+
+
+class EmployeeShift(str, enum.Enum):
+    MORNING = "MORNING"
+    EVENING = "EVENING"
+    NIGHT = "NIGHT"
+    FULL_TIME = "FULL_TIME"
+
+
+class EmployeeOnlineStatus(str, enum.Enum):
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    ON_BREAK = "ON_BREAK"
+    BUSY = "BUSY"

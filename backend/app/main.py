@@ -19,11 +19,37 @@ logger = logging.getLogger("dineflow.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan context for async database table initialization."""
+    """Application lifespan context for async database table initialization and seeding."""
     logger.info("Initializing database tables...")
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        from sqlalchemy import text
+        try:
+            await conn.execute(text("ALTER TABLE tables ADD COLUMN IF NOT EXISTS name VARCHAR(100);"))
+            await conn.execute(text("ALTER TABLE tables ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'VACANT';"))
+            await conn.execute(text("ALTER TABLE tables ADD COLUMN IF NOT EXISTS active_session_id VARCHAR(36);"))
+            await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS session_id VARCHAR(36);"))
+            await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS session_id VARCHAR(36);"))
+            await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS assigned_waiter_id VARCHAR(36);"))
+            await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS assigned_waiter_name VARCHAR(100);"))
+            await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE;"))
+            await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS in_progress_at TIMESTAMP WITH TIME ZONE;"))
+            await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE;"))
+            for val in ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'ARCHIVED']:
+                try:
+                    await conn.execute(text(f"ALTER TYPE requeststatus ADD VALUE IF NOT EXISTS '{val}';"))
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Migration check notice: {e}")
     logger.info("Database tables initialized successfully.")
+    
+    # Run Database Seeder
+    from app.core.database import AsyncSessionLocal
+    from app.core.database_seed import seed_database
+    async with AsyncSessionLocal() as session:
+        await seed_database(session)
+        
     yield
     logger.info("Shutting down DineFlow application...")
 
@@ -49,6 +75,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Static Files for Employee Photo Uploads
+import os
+from fastapi.staticfiles import StaticFiles
+uploads_dir = os.path.join(os.getcwd(), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Custom Middlewares
 app.add_middleware(RateLimitMiddleware)

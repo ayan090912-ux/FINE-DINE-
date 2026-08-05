@@ -1,15 +1,14 @@
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator
-from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from sqlalchemy import (
-    Boolean,
-    DateTime,
-    String,
-    create_engine,
+from sqlalchemy import Boolean, DateTime, String, create_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
 )
-
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -18,14 +17,7 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-
 from app.core.config import settings
-
 
 # ==========================================================
 # DATABASE URLS
@@ -34,8 +26,7 @@ from app.core.config import settings
 DATABASE_URL = settings.DATABASE_URL
 SYNC_DATABASE_URL = settings.SYNC_DATABASE_URL
 
-
-# Convert generic postgres URLs if needed
+# Convert generic postgres URLs
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql://",
@@ -51,9 +42,9 @@ if SYNC_DATABASE_URL.startswith("postgresql://"):
     )
 
 
-# ----------------------------------------------------------
-# Remove unsupported asyncpg query parameters
-# ----------------------------------------------------------
+# ==========================================================
+# Remove unsupported asyncpg parameters
+# ==========================================================
 
 def clean_asyncpg_url(url: str) -> str:
     parsed = urlparse(url)
@@ -63,9 +54,7 @@ def clean_asyncpg_url(url: str) -> str:
     query.pop("sslmode", None)
     query.pop("channel_binding", None)
 
-    return urlunparse(
-        parsed._replace(query=urlencode(query))
-    )
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 if DATABASE_URL.startswith("postgresql+asyncpg://"):
@@ -83,7 +72,6 @@ print("=" * 80)
 # ==========================================================
 
 is_sqlite = DATABASE_URL.startswith("sqlite")
-
 
 if is_sqlite:
 
@@ -106,14 +94,18 @@ if is_sqlite:
 
 else:
 
+    connect_args = {}
+
+    # Enable SSL only for Neon
+    if "neon.tech" in DATABASE_URL:
+        connect_args["ssl"] = "require"
+
     async_engine = create_async_engine(
         DATABASE_URL,
         echo=settings.DEBUG,
         future=True,
         pool_pre_ping=True,
-        connect_args={
-            "ssl": True,
-        },
+        connect_args=connect_args,
     )
 
     sync_engine = create_engine(
@@ -148,7 +140,6 @@ class Base(DeclarativeBase):
 
     @declared_attr.directive
     def __tablename__(cls):
-
         import re
 
         return re.sub(
@@ -208,17 +199,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
 
         try:
-
             yield session
-
             await session.commit()
 
         except Exception:
-
             await session.rollback()
-
             raise
 
         finally:
-
             await session.close()

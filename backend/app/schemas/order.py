@@ -49,6 +49,7 @@ class OrderItemResponse(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
     reason: Optional[str] = None
+    estimated_time_minutes: Optional[int] = None
 
 
 class FeedbackCreate(BaseModel):

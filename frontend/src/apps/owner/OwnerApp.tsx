@@ -9,6 +9,7 @@ import { QRManager } from './QRManager';
 import { PromotionsManager } from './PromotionsManager';
 import { SettingsManager } from './SettingsManager';
 import { FeedbackViewer } from './FeedbackViewer';
+import { EmployeeManager } from './EmployeeManager';
 import {
   LayoutDashboard,
   Utensils,
@@ -23,26 +24,33 @@ import {
   Calendar,
   Key,
   User,
+  Users,
 } from 'lucide-react';
 import { OrderStatusBadge } from '../../components/common/StatusBadge';
 
 interface NavItem {
-  id: 'dashboard' | 'business_day' | 'orders' | 'menu' | 'tables' | 'qr' | 'promotions' | 'settings' | 'feedback';
+  id: 'dashboard' | 'employees' | 'business_day' | 'orders' | 'menu' | 'tables' | 'qr' | 'promotions' | 'settings' | 'feedback';
   label: string;
   icon: React.ElementType;
   badge?: number;
 }
 
 export const OwnerApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const { settings, orders, ownerUsername, ownerSecurityCode } = useStore();
+  const { settings, orders = [], employees = [], ownerUsername, ownerSecurityCode } = useStore();
   const [currentSection, setCurrentSection] = useState<
-    'dashboard' | 'business_day' | 'orders' | 'menu' | 'tables' | 'qr' | 'promotions' | 'settings' | 'feedback'
-  >('dashboard');
+    'dashboard' | 'employees' | 'business_day' | 'orders' | 'menu' | 'tables' | 'qr' | 'promotions' | 'settings' | 'feedback'
+  >(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/employees')) {
+      return 'employees';
+    }
+    return 'dashboard';
+  });
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard & Analytics', icon: LayoutDashboard },
+    { id: 'employees', label: 'Employee Management (EMS)', icon: Users, badge: (employees || []).length },
     { id: 'business_day', label: 'Business Day Management', icon: Calendar },
-    { id: 'orders', label: 'All Orders Stream', icon: ShoppingBag, badge: orders.length },
+    { id: 'orders', label: 'All Orders Stream', icon: ShoppingBag, badge: (orders || []).length },
     { id: 'menu', label: 'Menu & Dishes', icon: Utensils },
     { id: 'tables', label: 'Table Floor Plan', icon: MapPin },
     { id: 'qr', label: 'Table QR Station', icon: QrCode },
@@ -186,6 +194,7 @@ export const OwnerApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
               onNavigateToOrders={() => setCurrentSection('orders')}
             />
           )}
+          {currentSection === 'employees' && <EmployeeManager />}
           {currentSection === 'business_day' && <BusinessDayManager />}
           {currentSection === 'orders' && <OrderStreamManager />}
           {currentSection === 'menu' && <MenuManager />}

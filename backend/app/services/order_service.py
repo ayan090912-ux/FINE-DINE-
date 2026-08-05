@@ -26,12 +26,15 @@ class OrderService:
         if not restaurant or not restaurant.is_active:
             raise NotFoundException("Restaurant", request.restaurant_id)
 
+        session_id = None
         if request.table_id:
             table = await self.table_repo.get_by_id(request.table_id)
             if not table:
                 raise NotFoundException("Table", request.table_id)
-            # Automatically mark table as occupied
-            await self.table_repo.update(table, {"is_occupied": True})
+            from app.services.session_service import SessionService
+            session_service = SessionService(self.session)
+            active_session = await session_service.get_or_create_active_session(request.restaurant_id, request.table_id)
+            session_id = active_session.id
 
         # Calculate Order Totals
         subtotal = 0.0
@@ -93,6 +96,7 @@ class OrderService:
         order = await self.order_repo.create({
             "restaurant_id": request.restaurant_id,
             "table_id": request.table_id,
+            "session_id": session_id,
             "order_number": order_number,
             "customer_name": request.customer_name or "Guest Customer",
             "customer_phone": request.customer_phone,
@@ -139,6 +143,9 @@ class OrderService:
             raise NotFoundException("Order", order_id)
 
         order.status = update_in.status
+        if update_in.estimated_time_minutes is not None:
+            order.estimated_time_minutes = update_in.estimated_time_minutes
+
         await self.session.flush()
 
         ws_event = {
@@ -147,7 +154,8 @@ class OrderService:
             "data": {
                 "order_id": order.id,
                 "status": order.status,
-                "order_number": order.order_number
+                "order_number": order.order_number,
+                "estimated_time_minutes": order.estimated_time_minutes
             }
         }
         await ws_manager.broadcast_to_restaurant(order.restaurant_id, ws_event)

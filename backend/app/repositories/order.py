@@ -36,7 +36,11 @@ class OrderRepository(BaseRepository[Order]):
         ]
         query = (
             select(Order)
-            .options(selectinload(Order.items))
+            .options(
+                selectinload(Order.items),
+                selectinload(Order.feedback),
+                selectinload(Order.payment)
+            )
             .where(
                 Order.restaurant_id == restaurant_id,
                 Order.status.in_(active_statuses),

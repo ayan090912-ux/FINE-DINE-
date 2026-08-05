@@ -12,7 +12,10 @@ import {
   Calendar,
   RotateCcw,
   ArrowRight,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
+import { OrderStatus } from '../../types';
 import { OrderStatusBadge } from '../../components/common/StatusBadge';
 import { fetchRestaurantOrders, updateOrderStatusViaApi } from '../../services/api';
 
@@ -20,29 +23,28 @@ export const OwnerDashboard: React.FC<{
   onNavigateToBusinessDay?: () => void;
   onNavigateToOrders?: () => void;
 }> = ({ onNavigateToBusinessDay, onNavigateToOrders }) => {
-  const { tables, menuItems, feedbacks, settings, currentDailyOrderSequence } = useStore();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { tables = [], menuItems = [], feedbacks = [], settings, currentDailyOrderSequence, orders = [], serviceRequests = [], employees = [], updateOrderStatus } = useStore();
+  const [nowMs, setNowMs] = useState(Date.now());
 
   useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const data = await fetchRestaurantOrders(settings.id || 'dineflow');
-        setOrders(data);
-      } catch (error) {
-        console.error('Unable to load owner orders', error);
-      }
-    };
+    const timer = setInterval(() => setNowMs(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
 
-    loadOrders();
-    const intervalId = window.setInterval(loadOrders, 10000);
-    return () => window.clearInterval(intervalId);
-  }, [settings.id]);
+  const getSessionDurationStr = (emp: any) => {
+    let totalMinutes = emp.todayWorkingMinutes || 0;
+    if (emp.onlineStatus === 'ONLINE' && emp.currentSessionStart) {
+      const elapsedMs = Math.max(0, nowMs - new Date(emp.currentSessionStart).getTime());
+      totalMinutes += Math.floor(elapsedMs / 60000);
+    }
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hrs}h ${mins < 10 ? '0' : ''}${mins}m`;
+  };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     try {
-      await updateOrderStatusViaApi(orderId, status);
-      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
-      setOrders(next);
+      await updateOrderStatus(orderId, status);
     } catch (error) {
       console.error('Unable to update order status', error);
     }
@@ -268,105 +270,149 @@ export const OwnerDashboard: React.FC<{
         </div>
       </div>
 
-      {/* Live Orders Stream */}
-      <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-lg space-y-4">
+      {/* Live Employee Attendance & Session Duration Section */}
+      <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl space-y-4 shadow-xl">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-white">Live Recent Orders Stream</h3>
-            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-              {orders.length} Total
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Real-Time Employee Attendance & Live Session Monitor</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              </h3>
+              <p className="text-xs text-zinc-400">Live active working timers, login times & online/offline status</p>
+            </div>
           </div>
-
-          {onNavigateToOrders && (
-            <button
-              onClick={onNavigateToOrders}
-              className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition cursor-pointer"
-            >
-              <span>View Full Order Stream & POS</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+            {employees.filter((e: any) => e.onlineStatus === 'ONLINE').length} Staff Online Now
+          </span>
         </div>
 
-        {orders.length === 0 ? (
-          <div className="text-center py-10 text-zinc-500 text-xs">
-            No active orders recorded yet. Table QR orders will automatically stream here!
+        {employees.length === 0 ? (
+          <div className="text-center py-6 text-zinc-500 text-xs">
+            No employees registered yet. Go to Employee Management to create accounts.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500 font-semibold">
-                  <th className="pb-3">Order #</th>
-                  <th className="pb-3">Table</th>
-                  <th className="pb-3">Items</th>
-                  <th className="pb-3">Total</th>
-                  <th className="pb-3">Status</th>
-                  <th className="pb-3">Time</th>
-                  <th className="pb-3 text-right">Quick Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {orders.slice(0, 6).map((order) => (
-                  <tr key={order.id} className="hover:bg-zinc-800/30 transition">
-                    <td className="py-3 font-extrabold text-amber-400">{order.orderNumber}</td>
-                    <td className="py-3 font-semibold text-zinc-200">{order.tableName}</td>
-                    <td className="py-3 text-zinc-400 max-w-xs truncate">
-                      {order.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
-                    </td>
-                    <td className="py-3 font-mono font-bold text-white">
-                      {settings.currencySymbol}{order.totalAmount.toFixed(2)}
-                    </td>
-                    <td className="py-3">
-                      <OrderStatusBadge status={order.status} />
-                    </td>
-                    <td className="py-3 text-zinc-500">
-                      {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="py-3 text-right">
-                      {order.status === 'received' && (
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'preparing')}
-                          className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Accept
-                        </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {employees.map((emp: any) => {
+              const isOnline = emp.onlineStatus === 'ONLINE';
+              const duration = getSessionDurationStr(emp);
+              const loginTimeStr = emp.lastLoginAt
+                ? new Date(emp.lastLoginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'Not logged in';
+
+              return (
+                <div
+                  key={emp.id}
+                  className={`p-3.5 rounded-xl bg-zinc-950 border flex items-center justify-between gap-3 ${
+                    isOnline ? 'border-emerald-500/30' : 'border-zinc-800/80 opacity-75'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      {emp.photoUrl ? (
+                        <img src={emp.photoUrl} alt={emp.fullName} className="w-10 h-10 rounded-xl object-cover border border-zinc-700" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-amber-400 text-xs">
+                          {emp.fullName.slice(0, 2).toUpperCase()}
+                        </div>
                       )}
-                      {order.status === 'preparing' && (
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'ready')}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Mark Ready
-                        </button>
-                      )}
-                      {order.status === 'ready' && (
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'delivered')}
-                          className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Deliver
-                        </button>
-                      )}
-                      {order.status === 'delivered' && (
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'completed')}
-                          className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border border-zinc-700 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Close
-                        </button>
-                      )}
-                      {(order.status === 'completed' || order.status === 'cancelled') && (
-                        <span className="text-[11px] text-zinc-500 italic">Archived</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <span
+                        className={`w-3 h-3 rounded-full border-2 border-zinc-950 absolute -bottom-0.5 -right-0.5 ${
+                          isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'
+                        }`}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold text-white truncate">{emp.fullName}</p>
+                      <p className="text-[10px] text-zinc-400 font-semibold">{emp.role} • {emp.position}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${isOnline ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-500 bg-zinc-800'}`}>
+                      {isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}
+                    </span>
+                    <p className="text-[11px] font-mono font-bold text-amber-400 mt-1">
+                      Logged: {loginTimeStr}
+                    </p>
+                    <p className="text-[10px] font-mono font-bold text-zinc-300">
+                      Working: <span className="text-emerald-300">{duration}</span>
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
+      </div>
+
+      {/* Waiter Live Dispatch & Performance Monitor */}
+      <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Waiter Live Dispatch & Staff Performance Monitor</h3>
+              <p className="text-xs text-zinc-400">Real-time floor dispatch metrics, average response times & request metrics</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Service Requests Table */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Active Live Calls ({serviceRequests.filter((r) => r.status !== 'archived' && r.status !== 'completed').length})</h4>
+          {serviceRequests.filter((r) => r.status !== 'archived' && r.status !== 'completed').length === 0 ? (
+            <div className="text-center py-6 bg-zinc-950/60 border border-zinc-800/80 rounded-xl text-zinc-500 text-xs font-medium">
+              No active customer requests pending in dispatch.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500 font-semibold">
+                    <th className="pb-2">Table</th>
+                    <th className="pb-2">Request Type</th>
+                    <th className="pb-2">Status</th>
+                    <th className="pb-2">Assigned Waiter</th>
+                    <th className="pb-2 text-right">Time Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50">
+                  {serviceRequests
+                    .filter((r) => r.status !== 'archived' && r.status !== 'completed')
+                    .map((r) => (
+                      <tr key={r.id} className="hover:bg-zinc-800/30">
+                        <td className="py-2.5 font-bold text-amber-400">{r.tableName}</td>
+                        <td className="py-2.5 capitalize font-semibold text-zinc-200">{r.type.replace('_', ' ')}</td>
+                        <td className="py-2.5">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              r.status === 'pending'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'
+                                : r.status === 'accepted' || r.status === 'in_progress'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                            }`}
+                          >
+                            {r.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-2.5 font-bold text-white">{r.assignedWaiterName || 'Unassigned'}</td>
+                        <td className="py-2.5 text-right text-zinc-500 font-mono">
+                          {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

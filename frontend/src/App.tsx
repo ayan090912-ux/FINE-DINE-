@@ -5,10 +5,10 @@ import { OwnerApp } from './apps/owner/OwnerApp';
 import { KitchenApp } from './apps/kitchen/KitchenApp';
 import { WaiterApp } from './apps/waiter/WaiterApp';
 import { LoginView } from './apps/auth/LoginView';
-import { QrCode, ShieldCheck, ChefHat, BellRing, Smartphone, ExternalLink } from 'lucide-react';
+import { QrCode, ShieldCheck, ChefHat, BellRing, Smartphone, ExternalLink, Zap } from 'lucide-react';
 
 function AppContent() {
-  const { authUsers, logout, settings, tables } = useStore();
+  const { authUsers, login, logout, settings, tables, ownerUsername, ownerPassword } = useStore();
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
   });
@@ -27,7 +27,7 @@ function AppContent() {
     setCurrentPath(path);
   };
 
-  // 1. Customer Application Route Check (/qr/:restaurantId/:tableId or default customer mode)
+  // 1. Customer Application Route Check (/qr/:restaurantId/:tableId)
   if (currentPath.startsWith('/qr/')) {
     const parts = currentPath.split('/');
     const restaurantId = parts[2] || 'dineflow';
@@ -36,7 +36,7 @@ function AppContent() {
     return <CustomerApp restaurantId={restaurantId} tableId={tableId} />;
   }
 
-  // 2. Owner Application Route Check (/admin or /admin/login or /admin/dashboard)
+  // 2. Owner Application Route Check (/admin)
   if (currentPath.startsWith('/admin')) {
     if (!authUsers.owner) {
       return (
@@ -49,7 +49,7 @@ function AppContent() {
     return <OwnerApp onLogout={() => { logout('owner'); navigateTo('/admin/login'); }} />;
   }
 
-  // 3. Kitchen Application Route Check (/kitchen or /kitchen/login or /kitchen/dashboard)
+  // 3. Kitchen Application Route Check (/kitchen)
   if (currentPath.startsWith('/kitchen')) {
     if (!authUsers.kitchen) {
       return (
@@ -62,7 +62,7 @@ function AppContent() {
     return <KitchenApp onLogout={() => { logout('kitchen'); navigateTo('/kitchen/login'); }} />;
   }
 
-  // 4. Waiter Application Route Check (/waiter or /waiter/login or /waiter/dashboard)
+  // 4. Waiter Application Route Check (/waiter)
   if (currentPath.startsWith('/waiter')) {
     if (!authUsers.waiter) {
       return (
@@ -75,8 +75,7 @@ function AppContent() {
     return <WaiterApp onLogout={() => { logout('waiter'); navigateTo('/waiter/login'); }} />;
   }
 
-  // 5. Default Landing / Simulation Router Screen at root '/'
-  // Allows testing all 4 applications in isolation while keeping Customer UI strictly separated!
+  // 5. Landing / Simulation Router Screen at root '/'
   const defaultTable = tables[0] || { id: 't-4', tableNumber: '04' };
 
   return (
@@ -89,12 +88,11 @@ function AppContent() {
         <div className="space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-xs">
             <QrCode className="w-4 h-4" />
-            <span>Restaurant Operating System</span>
+            <span>SaaS Restaurant Operating System</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">{settings.name}</h1>
           <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Four completely independent applications operating on the same live backend context.
-            Select a terminal below to enter that system.
+            Select an application portal below. All employee portals require authentication.
           </p>
         </div>
 
@@ -113,20 +111,21 @@ function AppContent() {
             </div>
             <div>
               <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition">
-                1. Customer App (QR Mode)
+                1. Customer QR App
               </h3>
               <p className="text-xs text-zinc-400 mt-1">
-                Scanned via Table QR code. Menu browsing, multi-orders, live ETA countdown, call waiter, and reviews.
+                Scanned via Table QR code. Menu browsing, dining sessions, orders, and service calls.
               </p>
             </div>
-            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-amber-400/80">
-              URL: /qr/dineflow/{defaultTable.id}
+            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-amber-400/80 flex items-center justify-between">
+              <span>URL: /qr/dineflow/{defaultTable.id}</span>
+              <span className="font-bold text-emerald-400 flex items-center gap-1"><Zap className="w-3 h-3" /> Customer Scan</span>
             </div>
           </div>
 
           {/* Owner App Card */}
           <div
-            onClick={() => navigateTo('/admin/login')}
+            onClick={() => navigateTo('/admin/dashboard')}
             className="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-amber-500/50 cursor-pointer transition group space-y-3"
           >
             <div className="flex items-center justify-between">
@@ -137,20 +136,21 @@ function AppContent() {
             </div>
             <div>
               <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition">
-                2. Owner Portal
+                2. Owner Dashboard
               </h3>
               <p className="text-xs text-zinc-400 mt-1">
-                Revenue analytics, table management, QR generator with card printing, drag & drop menu, and offer engine.
+                Revenue analytics, employee management, live attendance, shift monitor & settings.
               </p>
             </div>
-            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-amber-400/80">
-              URL: /admin/dashboard
+            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-amber-400/80 flex items-center justify-between">
+              <span>URL: /admin/login</span>
+              <span className="font-bold text-amber-400 flex items-center gap-1">Owner Credentials</span>
             </div>
           </div>
 
           {/* Kitchen App Card */}
           <div
-            onClick={() => navigateTo('/kitchen/login')}
+            onClick={() => navigateTo('/kitchen/dashboard')}
             className="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-amber-500/50 cursor-pointer transition group space-y-3"
           >
             <div className="flex items-center justify-between">
@@ -164,17 +164,18 @@ function AppContent() {
                 3. Kitchen Display System (KDS)
               </h3>
               <p className="text-xs text-zinc-400 mt-1">
-                POS-style queue board, audio order chimes, stage transitions, and live ETA setting.
+                Live cooking queue, order stage transitions, audio chimes, and preparation ETAs.
               </p>
             </div>
-            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-orange-400/80">
-              URL: /kitchen/dashboard
+            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-orange-400/80 flex items-center justify-between">
+              <span>URL: /kitchen/login</span>
+              <span className="font-bold text-orange-400 flex items-center gap-1">Kitchen Login Required</span>
             </div>
           </div>
 
           {/* Waiter App Card */}
           <div
-            onClick={() => navigateTo('/waiter/login')}
+            onClick={() => navigateTo('/waiter/dashboard')}
             className="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-amber-500/50 cursor-pointer transition group space-y-3"
           >
             <div className="flex items-center justify-between">
@@ -188,22 +189,23 @@ function AppContent() {
                 4. Waiter Terminal
               </h3>
               <p className="text-xs text-zinc-400 mt-1">
-                Floor dispatch for ready orders, water/bill/cutlery table requests, and delivery confirmation.
+                Real-time Live Waiter Dispatch, single-click request acceptance, and table status.
               </p>
             </div>
-            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-emerald-400/80">
-              URL: /waiter/dashboard
+            <div className="pt-2 border-t border-zinc-800/80 text-[11px] font-mono text-emerald-400/80 flex items-center justify-between">
+              <span>URL: /waiter/login</span>
+              <span className="font-bold text-emerald-400 flex items-center gap-1">Waiter Login Required</span>
             </div>
           </div>
         </div>
 
-        {/* Quick Launch Direct Button */}
-        <div className="pt-2 border-t border-zinc-800">
+        {/* Customer Quick Launch */}
+        <div className="pt-2 border-t border-zinc-800 flex justify-center">
           <button
             onClick={() => navigateTo(`/qr/dineflow/${defaultTable.id}`)}
-            className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-extrabold py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-xl shadow-amber-500/20 transition"
+            className="w-full sm:w-auto px-8 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-extrabold py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-xl shadow-amber-500/20 transition cursor-pointer"
           >
-            Launch Customer QR Application Demo (Table 04)
+            Open Customer QR App (Table 04)
           </button>
         </div>
       </div>

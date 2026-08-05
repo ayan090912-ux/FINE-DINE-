@@ -25,6 +25,18 @@ export interface Category {
 }
 
 export type TableSection = 'Indoor' | 'Outdoor' | 'VIP' | 'Rooftop';
+export type TableStatus = 'VACANT' | 'OCCUPIED' | 'RESERVED';
+
+export interface DiningSession {
+  id: string;
+  restaurantId: string;
+  tableId: string;
+  sessionCode: string;
+  status: 'ACTIVE' | 'BILL_REQUESTED' | 'COMPLETED' | 'CANCELLED';
+  guestCount: number;
+  openedAt: string;
+  closedAt?: string;
+}
 
 export interface Table {
   id: string;
@@ -32,9 +44,11 @@ export interface Table {
   name: string;
   capacity: number;
   section: TableSection;
+  status: TableStatus;
+  activeSessionId?: string;
   isActive: boolean;
   isOccupied: boolean;
-  mergedWithTableId?: string; // If merged with another table
+  mergedWithTableId?: string;
 }
 
 export type OrderStatus =
@@ -58,36 +72,112 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  orderNumber: string; // e.g. #101
+  orderNumber: string;
   restaurantId: string;
   tableId: string;
   tableName: string;
+  sessionId?: string;
   items: OrderItem[];
   status: OrderStatus;
   subtotal: number;
   discountAmount: number;
   appliedPromotionName?: string;
   totalAmount: number;
-  createdAt: string; // ISO string
+  createdAt: string;
   acceptedAt?: string;
   etaMinutes?: number;
-  estimatedCompletionTime?: string; // ISO string or time string
+  estimatedCompletionTime?: string;
   completedAt?: string;
   kitchenNotes?: string;
 }
 
 export type ServiceRequestType = 'water' | 'spoon' | 'tissue' | 'bill' | 'waiter_call';
+export type ServiceRequestStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'archived';
 
 export interface ServiceRequest {
   id: string;
   restaurantId: string;
   tableId: string;
   tableName: string;
+  sessionId?: string;
   type: ServiceRequestType;
   note?: string;
-  status: 'pending' | 'acknowledged' | 'fulfilled';
+  status: ServiceRequestStatus;
+  assignedWaiterId?: string;
+  assignedWaiterName?: string;
+  acceptedAt?: string;
+  inProgressAt?: string;
+  completedAt?: string;
   createdAt: string;
   fulfilledAt?: string;
+}
+
+export type EmploymentStatus = 'ACTIVE' | 'DISABLED' | 'ON_LEAVE';
+export type EmployeeShift = 'MORNING' | 'EVENING' | 'NIGHT' | 'FULL_TIME';
+export type EmployeeOnlineStatus = 'ONLINE' | 'OFFLINE' | 'ON_BREAK' | 'BUSY';
+
+export interface Employee {
+  id: string;
+  restaurantId: string;
+  employeeId: string;
+  fullName: string;
+  photoUrl?: string;
+  phoneNumber?: string;
+  email?: string;
+  address?: string;
+  dateOfBirth?: string;
+  joiningDate: string;
+  role: 'WAITER' | 'KITCHEN' | 'MANAGER' | 'OWNER';
+  position: string;
+  username: string;
+  employmentStatus: EmploymentStatus;
+  shift: EmployeeShift;
+  onlineStatus: EmployeeOnlineStatus;
+  lastLoginAt?: string;
+  lastLogoutAt?: string;
+  requiresPasswordChange: boolean;
+  notes?: string;
+  todayWorkingMinutes?: number;
+  weeklyHours?: number;
+  monthlyHours?: number;
+  attendancePercentage?: number;
+  currentSessionStart?: string;
+  // Performance stats for Waiters
+  ordersDelivered?: number;
+  billsClosed?: number;
+  waterRequests?: number;
+  waiterCalls?: number;
+  avgResponseTimeSeconds?: number;
+  tablesServed?: number;
+  // Performance stats for Kitchen
+  ordersAccepted?: number;
+  ordersCompleted?: number;
+  avgPrepTimeMinutes?: number;
+  delayedOrders?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WaiterPerformanceStats {
+  waiterId: string;
+  waiterName: string;
+  requestsAccepted: number;
+  requestsCompleted: number;
+  avgResponseTimeSeconds: number;
+  avgCompletionTimeSeconds: number;
+  waterRequests: number;
+  spoonRequests: number;
+  tissueRequests: number;
+  billRequests: number;
+  waiterCalls: number;
+}
+
+export interface WaitersPerformanceResponse {
+  totalPendingRequests: number;
+  totalAcceptedRequests: number;
+  totalCompletedRequests: number;
+  overallAvgResponseTimeSeconds: number;
+  waiters: WaiterPerformanceStats[];
 }
 
 export type DiscountType = 'percentage' | 'flat' | 'bogo' | 'free_item';
@@ -97,7 +187,7 @@ export interface Promotion {
   title: string;
   description: string;
   discountType: DiscountType;
-  discountValue: number; // e.g. 20 for 20% or $10 for flat $10
+  discountValue: number;
   minimumOrderAmount: number;
   maxDiscountAmount?: number;
   promoCode?: string;
@@ -111,7 +201,7 @@ export interface Feedback {
   id: string;
   tableId: string;
   tableName: string;
-  rating: number; // 1 to 5
+  rating: number;
   customerName?: string;
   comment: string;
   createdAt: string;
@@ -135,8 +225,8 @@ export interface RestaurantSettings {
 
 export interface BusinessDayRecord {
   id: string;
-  date: string; // e.g. "15 July 2026"
-  closedAt: string; // ISO timestamp
+  date: string;
+  closedAt: string;
   totalRevenue: number;
   totalOrders: number;
   totalCustomers: number;
@@ -152,4 +242,9 @@ export interface AuthUser {
   role: UserRole;
   username: string;
   token: string;
+  id?: string;
+  fullName?: string;
+  employeeId?: string;
+  position?: string;
+  photoUrl?: string;
 }

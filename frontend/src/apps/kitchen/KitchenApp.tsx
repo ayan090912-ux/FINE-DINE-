@@ -19,30 +19,14 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const { settings } = useStore();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { settings, orders, authUsers, updateOrderStatus, updateOrderEta } = useStore();
+  const kitchenStaffName = authUsers.kitchen?.fullName || authUsers.kitchen?.username || 'Kitchen Staff';
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'all' | 'active' | 'ready' | 'completed'>('active');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // ETA Modal state for active order
   const [etaModalOrder, setEtaModalOrder] = useState<Order | null>(null);
   const [customEta, setCustomEta] = useState<number>(15);
-
-  useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const restaurantId = settings.id || 'dineflow';
-        const data = await fetchRestaurantOrders(restaurantId);
-        setOrders(data);
-      } catch (error) {
-        console.error('Unable to load kitchen orders', error);
-      }
-    };
-
-    loadOrders();
-    const intervalId = window.setInterval(loadOrders, 8000);
-    return () => window.clearInterval(intervalId);
-  }, [settings.id]);
 
   const filteredOrders = orders.filter((o) => {
     if (selectedStatusFilter === 'active') {
@@ -65,9 +49,7 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
   const handleConfirmEta = async () => {
     if (!etaModalOrder) return;
     try {
-      await updateOrderStatusViaApi(etaModalOrder.id, 'preparing');
-      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
-      setOrders(next);
+      await updateOrderEta(etaModalOrder.id, customEta);
       setEtaModalOrder(null);
     } catch (error) {
       console.error('Unable to update ETA', error);
@@ -76,9 +58,7 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     try {
-      await updateOrderStatusViaApi(orderId, status);
-      const next = await fetchRestaurantOrders(settings.id || 'dineflow');
-      setOrders(next);
+      await updateOrderStatus(orderId, status);
     } catch (error) {
       console.error('Unable to update order status', error);
     }
@@ -93,10 +73,31 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
             <ChefHat className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              <span>Kitchen Display System (KDS)</span>
-            </h1>
-            <p className="text-xs text-zinc-400">{settings.name} • Live Cooking Queue</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                <span>Kitchen Display System (KDS)</span>
+              </h1>
+              {authUsers.kitchen?.employeeId && (
+                <span className="text-[10px] font-mono font-bold text-orange-400 px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800">
+                  {authUsers.kitchen.employeeId}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-zinc-400">{settings.name} • Live Queue</span>
+              <span className="text-zinc-600">•</span>
+              <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-0.5 text-[11px] font-bold text-orange-400">
+                {authUsers.kitchen?.photoUrl ? (
+                  <img src={authUsers.kitchen.photoUrl} alt={kitchenStaffName} className="w-4 h-4 rounded-full object-cover" />
+                ) : (
+                  <ChefHat className="w-3 h-3 text-orange-400" />
+                )}
+                <span>{kitchenStaffName}</span>
+                {authUsers.kitchen?.position && (
+                  <span className="text-[10px] text-zinc-400 font-normal">({authUsers.kitchen.position})</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -105,7 +106,7 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
           {/* Sound Notification Toggle */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-semibold transition ${
+            className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-semibold transition cursor-pointer ${
               soundEnabled
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                 : 'bg-zinc-800 border-zinc-700 text-zinc-500'
@@ -119,7 +120,7 @@ export const KitchenApp: React.FC<{ onLogout: () => void }> = ({ onLogout }) => 
           {/* Logout */}
           <button
             onClick={onLogout}
-            className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition flex items-center gap-2 text-xs font-semibold"
+            className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition flex items-center gap-2 text-xs font-semibold cursor-pointer"
           >
             <LogOut className="w-4 h-4 text-rose-400" />
             <span className="hidden sm:inline">Logout</span>

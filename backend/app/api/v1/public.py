@@ -5,7 +5,7 @@ from app.schemas.common import APIResponse
 from app.schemas.customer_request import CustomerRequestCreate, CustomerRequestResponse
 from app.schemas.menu import PublicMenuResponse
 from app.schemas.order import FeedbackCreate, FeedbackResponse, OrderCreateRequest, OrderResponse
-from app.schemas.table import TableScanResolution
+from app.schemas.table import TableResponse, TableScanResolution
 from app.services.customer_request_service import CustomerRequestService
 from app.services.menu_service import MenuService
 from app.services.order_service import OrderService

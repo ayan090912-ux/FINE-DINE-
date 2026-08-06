@@ -10,6 +10,7 @@ interface CallWaiterModalProps {
   onClose: () => void;
   restaurantId: string;
   tableId: string;
+  tableNumber?: string;
 }
 
 export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
@@ -17,10 +18,13 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
   onClose,
   restaurantId,
   tableId,
+  tableNumber,
 }) => {
   const { settings } = useStore();
   const [customNote, setCustomNote] = useState('');
   const [submittedType, setSubmittedType] = useState<string | null>(null);
+
+  const displayNum = tableNumber || (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
 
   if (!isOpen) return null;
 
@@ -64,7 +68,7 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-bold text-white">Call Waiter Service</h2>
-                <p className="text-xs text-zinc-400">Select what you need for Table {tableId}</p>
+                <p className="text-xs text-zinc-400">Select what you need for Table {displayNum}</p>
               </div>
             </div>
             <button
@@ -81,7 +85,7 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
                 <Check className="w-6 h-6" />
               </div>
               <p className="text-sm font-bold text-white">Request Dispatched to Waiter Terminal</p>
-              <p className="text-xs text-zinc-400">A waiter will arrive at Table {tableId} shortly!</p>
+              <p className="text-xs text-zinc-400">A waiter will arrive at Table {displayNum} shortly!</p>
             </div>
           ) : (
             <>

@@ -7,18 +7,22 @@ interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
   tableId: string;
+  tableNumber?: string;
 }
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   isOpen,
   onClose,
   tableId,
+  tableNumber,
 }) => {
   const { submitFeedback } = useStore();
   const [rating, setRating] = useState(5);
   const [name, setName] = useState('');
   const [comment, setComment] = useState('');
   const [isDone, setIsDone] = useState(false);
+
+  const displayNum = tableNumber || (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
 
   if (!isOpen) return null;
 
@@ -28,7 +32,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
     submitFeedback({
       tableId,
-      tableName: `Table ${tableId}`,
+      tableName: `Table ${displayNum}`,
       rating,
       customerName: name.trim() || 'Valued Guest',
       comment: comment.trim(),

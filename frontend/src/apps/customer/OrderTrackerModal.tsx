@@ -9,6 +9,7 @@ interface OrderTrackerModalProps {
   isOpen: boolean;
   onClose: () => void;
   tableId: string;
+  tableNumber?: string;
   orders: Order[];
   currencySymbol: string;
 }
@@ -17,10 +18,13 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
   isOpen,
   onClose,
   tableId,
+  tableNumber,
   orders,
   currencySymbol,
 }) => {
   const [, setTick] = useState(0);
+
+  const displayNum = tableNumber || (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
 
   // Force tick every second to keep countdown timers live!
   useEffect(() => {
@@ -84,7 +88,7 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
                 <span>Live Table Orders Tracking</span>
               </h2>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Real-time status & Kitchen ETA updates for Table {tableId}
+                Real-time status & Kitchen ETA updates for Table {displayNum}
               </p>
             </div>
             <button

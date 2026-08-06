@@ -123,17 +123,36 @@ const mapBackendRequestType = (type?: string): ServiceRequestType => {
   }
 };
 
+const getCleanTableNameFromRaw = (raw: any): string => {
+  const rawTableName = raw.table_name || raw.tableName;
+  if (rawTableName && (!rawTableName.includes('-') || rawTableName.length <= 15)) {
+    return rawTableName;
+  }
+  const rawTableNum = raw.table_number || raw.tableNumber;
+  if (rawTableNum && String(rawTableNum).trim()) {
+    return `Table ${String(rawTableNum).replace(/^t-/, '')}`;
+  }
+  const tid = raw.table_id || raw.tableId || '';
+  if (tid && (!tid.includes('-') || tid.length <= 10)) {
+    return `Table ${tid.replace(/^t-/, '')}`;
+  }
+  return 'Table';
+};
+
 export const normalizeOrder = (raw: any): Order => {
   const createdAt = raw.created_at || raw.createdAt || new Date().toISOString();
-  const etaMinutes = raw.estimated_time_minutes || raw.etaMinutes;
-  const estimatedCompletionTime = etaMinutes ? new Date(new Date(createdAt).getTime() + etaMinutes * 60000).toISOString() : undefined;
+  const etaMinutes = raw.eta_minutes ?? raw.etaMinutes;
+  let estimatedCompletionTime = raw.estimated_completion_time || raw.estimatedCompletionTime;
+  if (!estimatedCompletionTime && etaMinutes) {
+    estimatedCompletionTime = new Date(new Date(createdAt).getTime() + etaMinutes * 60000).toISOString();
+  }
 
   return {
     id: raw.id,
     orderNumber: raw.order_number || raw.orderNumber || `#${raw.id}`,
     restaurantId: raw.restaurant_id || raw.restaurantId || 'dineflow',
     tableId: raw.table_id || raw.tableId || '',
-    tableName: raw.table_name || raw.tableName || `Table ${raw.table_id || raw.tableId || 'Unknown'}`,
+    tableName: getCleanTableNameFromRaw(raw),
     items: (raw.items || []).map((item: any) => ({
       id: item.id,
       menuItemId: item.menu_item_id || item.menuItemId,
@@ -160,7 +179,7 @@ export const normalizeServiceRequest = (raw: any): ServiceRequest => ({
   id: raw.id,
   restaurantId: raw.restaurant_id || raw.restaurantId || 'dineflow',
   tableId: raw.table_id || raw.tableId || '',
-  tableName: raw.table_name || raw.tableName || `Table ${raw.table_id || raw.tableId || 'Unknown'}`,
+  tableName: getCleanTableNameFromRaw(raw),
   sessionId: raw.session_id || raw.sessionId,
   type: mapBackendRequestType(raw.request_type || raw.type),
   note: raw.notes || raw.note,
@@ -195,17 +214,25 @@ export const normalizeMenuItem = (raw: any): MenuItem => ({
   spicyLevel: raw.is_spicy ? 2 : 0,
 });
 
-export const normalizeTable = (raw: any): Table => ({
-  id: raw.id,
-  tableNumber: raw.table_number || raw.tableNumber || raw.id,
-  name: raw.name || `Table ${raw.table_number || raw.id}`,
-  capacity: Number(raw.capacity || 4),
-  section: (raw.section as TableSection) || 'Indoor',
-  status: (raw.status as TableStatus) || (raw.is_occupied || raw.isOccupied ? 'OCCUPIED' : 'VACANT'),
-  activeSessionId: raw.active_session_id || raw.activeSessionId,
-  isOccupied: Boolean(raw.is_occupied ?? raw.isOccupied ?? (raw.status === 'OCCUPIED')),
-  isActive: Boolean(raw.is_active ?? raw.isActive ?? true),
-});
+export const normalizeTable = (raw: any): Table => {
+  let num = raw.table_number || raw.tableNumber;
+  if (!num || (typeof num === 'string' && num.includes('-') && num.length > 10)) {
+    num = (raw.name && raw.name.replace(/[^0-9]/g, '')) || '1';
+  }
+  const cleanNum = String(num).replace(/^t-/, '');
+
+  return {
+    id: raw.id,
+    tableNumber: cleanNum,
+    name: raw.name || `Table ${cleanNum}`,
+    capacity: Number(raw.capacity || 4),
+    section: (raw.section as TableSection) || 'Indoor',
+    status: (raw.status as TableStatus) || (raw.is_occupied || raw.isOccupied ? 'OCCUPIED' : 'VACANT'),
+    activeSessionId: raw.active_session_id || raw.activeSessionId,
+    isOccupied: Boolean(raw.is_occupied ?? raw.isOccupied ?? (raw.status === 'OCCUPIED')),
+    isActive: Boolean(raw.is_active ?? raw.isActive ?? true),
+  };
+};
 
 export const normalizeRestaurantSettings = (raw: any): RestaurantSettings => {
   if (!raw) {

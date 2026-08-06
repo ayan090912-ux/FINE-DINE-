@@ -35,10 +35,18 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   // Cart State (stored locally for customer session)
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  const activeTable = tables.find((t) => t.id === tableId || t.tableNumber === tableId) || {
+  const matchedTable = tables.find(
+    (t) => t.id === tableId || t.tableNumber === tableId || t.tableNumber === tableId.replace(/^t-/, '')
+  );
+
+  const cleanTableNumber = matchedTable
+    ? matchedTable.tableNumber
+    : (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
+
+  const activeTable = matchedTable || {
     id: tableId,
-    tableNumber: tableId,
-    name: `Table ${tableId}`,
+    tableNumber: cleanTableNumber,
+    name: matchedTable?.name || `Table ${cleanTableNumber}`,
   };
 
   // Active orders placed by this table
@@ -330,6 +338,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         isOpen={isOrdersOpen}
         onClose={() => setIsOrdersOpen(false)}
         tableId={activeTable.id}
+        tableNumber={activeTable.tableNumber}
         orders={orders}
         currencySymbol={settings.currencySymbol}
       />
@@ -339,12 +348,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         onClose={() => setIsCallWaiterOpen(false)}
         restaurantId={restaurantId}
         tableId={activeTable.id}
+        tableNumber={activeTable.tableNumber}
       />
 
       <FeedbackModal
         isOpen={isFeedbackOpen}
         onClose={() => setIsFeedbackOpen(false)}
         tableId={activeTable.id}
+        tableNumber={activeTable.tableNumber}
       />
     </div>
   );

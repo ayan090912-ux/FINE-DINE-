@@ -264,8 +264,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadSettings = useCallback(async () => {
     try {
       const fetchedSettings = await fetchRestaurantSettingsViaApi(restaurantId);
-      if (fetchedSettings) {
-        setSettings(fetchedSettings);
+      if (fetchedSettings && fetchedSettings.name) {
+        setSettings((prev) => ({ ...prev, ...fetchedSettings }));
       }
     } catch (err) {
       console.warn('[DineFlow Store] Backend settings fetch failed.', err);
@@ -276,8 +276,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadMenu = useCallback(async () => {
     try {
       const data = await fetchPublicMenu(restaurantId);
-      if (data.categories) setCategories(data.categories);
-      if (data.menuItems) setMenuItems(data.menuItems);
+      if (data.categories && data.categories.length > 0) setCategories(data.categories);
+      if (data.menuItems && data.menuItems.length > 0) setMenuItems(data.menuItems);
       if (data.currency) {
         setSettings((prev) => ({ ...prev, currencySymbol: data.currency }));
       }

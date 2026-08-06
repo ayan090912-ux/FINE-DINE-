@@ -4,6 +4,7 @@ import { VegBadge } from '../../components/common/StatusBadge';
 import { X, Clock, Flame, Plus, Minus, ShoppingBag, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { resolveMediaUrl } from '../../services/api';
+import { useStore } from '../../context/StoreContext';
 
 interface FoodDetailModalProps {
   item: MenuItem | null;

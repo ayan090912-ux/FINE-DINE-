@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
@@ -15,7 +15,12 @@ class Category(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
 
     # Relationships
     restaurant: Mapped["Restaurant"] = relationship("Restaurant", back_populates="categories")
-    items: Mapped[List["MenuItem"]] = relationship("MenuItem", back_populates="category", cascade="all, delete-orphan")
+    items: Mapped[List["MenuItem"]] = relationship(
+        "MenuItem",
+        back_populates="category",
+        cascade="all, delete-orphan",
+        primaryjoin="and_(Category.id == MenuItem.category_id, MenuItem.is_deleted == False)"
+    )
 
 
 class MenuItem(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):

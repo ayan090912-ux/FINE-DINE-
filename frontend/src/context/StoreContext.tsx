@@ -173,19 +173,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return initialPromotions;
   });
 
-  const [settings, setSettings] = useState<RestaurantSettings>(() => {
-    const saved = localStorage.getItem('df_settings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (!parsed.id || parsed.id === 'rest-dineflow') {
-          parsed.id = 'dineflow';
-        }
-        return parsed;
-      } catch (e) {}
-    }
-    return initialRestaurantSettings;
-  });
+  const [settings, setSettings] = useState<RestaurantSettings>(initialRestaurantSettings);
 
   const [feedbacks, setFeedbacks] = useState<Feedback[]>(() => {
     const saved = localStorage.getItem('df_feedbacks');
@@ -250,7 +238,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // LocalStorage persist for settings & auth
   useEffect(() => { localStorage.setItem('df_promotions', JSON.stringify(promotions)); }, [promotions]);
-  useEffect(() => { localStorage.setItem('df_settings', JSON.stringify(settings)); }, [settings]);
   useEffect(() => { localStorage.setItem('df_feedbacks', JSON.stringify(feedbacks)); }, [feedbacks]);
   useEffect(() => { localStorage.setItem('df_auth_users', JSON.stringify(authUsers)); }, [authUsers]);
   useEffect(() => { localStorage.setItem('df_owner_username', ownerUsername); }, [ownerUsername]);
@@ -276,8 +263,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadMenu = useCallback(async () => {
     try {
       const data = await fetchPublicMenu(restaurantId);
-      if (data.categories && data.categories.length > 0) setCategories(data.categories);
-      if (data.menuItems && data.menuItems.length > 0) setMenuItems(data.menuItems);
+      if (Array.isArray(data.categories)) setCategories(data.categories);
+      if (Array.isArray(data.menuItems)) setMenuItems(data.menuItems);
       if (data.currency) {
         setSettings((prev) => ({ ...prev, currencySymbol: data.currency }));
       }
@@ -416,65 +403,56 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Category Actions
   const addCategory = async (category: Omit<Category, 'id'>) => {
     try {
-      const created = await createCategoryViaApi(restaurantId, category);
-      setCategories((prev) => [...prev, created]);
+      await createCategoryViaApi(restaurantId, category);
+      await loadMenu();
     } catch (err) {
       console.error('Failed to create category on backend', err);
-      // Fallback local update
-      const newCat: Category = { ...category, id: `cat-${Date.now()}` };
-      setCategories((prev) => [...prev, newCat]);
     }
   };
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
     try {
-      const updated = await updateCategoryViaApi(id, updates);
-      setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      await updateCategoryViaApi(id, updates);
+      await loadMenu();
     } catch (err) {
       console.error('Failed to update category on backend', err);
-      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
     }
   };
 
   const deleteCategory = async (id: string) => {
     try {
       await deleteCategoryViaApi(id);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      await loadMenu();
     } catch (err) {
       console.error('Failed to delete category on backend', err);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
     }
   };
 
   // MenuItem Actions
   const addMenuItem = async (item: Omit<MenuItem, 'id'>) => {
     try {
-      const created = await createMenuItemViaApi(restaurantId, item);
-      setMenuItems((prev) => [...prev, created]);
+      await createMenuItemViaApi(restaurantId, item);
+      await loadMenu();
     } catch (err) {
       console.error('Failed to create menu item on backend', err);
-      const newItem: MenuItem = { ...item, id: `item-${Date.now()}` };
-      setMenuItems((prev) => [...prev, newItem]);
     }
   };
 
   const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
     try {
-      const updated = await updateMenuItemViaApi(id, updates);
-      setMenuItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      await updateMenuItemViaApi(id, updates);
+      await loadMenu();
     } catch (err) {
       console.error('Failed to update menu item on backend', err);
-      setMenuItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
     }
   };
 
   const deleteMenuItem = async (id: string) => {
     try {
       await deleteMenuItemViaApi(id);
-      setMenuItems((prev) => prev.filter((item) => item.id !== id));
+      await loadMenu();
     } catch (err) {
       console.error('Failed to delete menu item on backend', err);
-      setMenuItems((prev) => prev.filter((item) => item.id !== id));
     }
   };
 
@@ -659,10 +637,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Settings & Feedback
   const updateSettings = async (updates: Partial<RestaurantSettings>) => {
-    setSettings((prev) => ({ ...prev, ...updates, id: 'dineflow' }));
     try {
       const updated = await updateRestaurantSettingsViaApi(restaurantId, updates);
       setSettings(updated);
+      await loadMenu();
+      await loadSettings();
     } catch (err) {
       console.error('Failed to update restaurant settings on backend', err);
     }

@@ -30,14 +30,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       const uploadedUrl = await uploadFn(file);
       onChange(uploadedUrl);
     } catch (err) {
-      console.warn('[ImageUploader] Backend file upload fallback to Data URL', err);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          onChange(e.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      console.error('[ImageUploader] Image upload failed', err);
+      alert(`Image upload failed: ${err instanceof Error ? err.message : 'Server error'}`);
     } finally {
       setIsUploading(false);
     }

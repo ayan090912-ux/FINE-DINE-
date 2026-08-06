@@ -403,7 +403,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Category Actions
   const addCategory = async (category: Omit<Category, 'id'>) => {
     try {
-      await createCategoryViaApi(restaurantId, category);
+      const created = await createCategoryViaApi(restaurantId, category);
+      setCategories((prev) => [...prev, created]);
       await loadMenu();
     } catch (err) {
       console.error('Failed to create category on backend', err);
@@ -412,7 +413,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
     try {
-      await updateCategoryViaApi(id, updates);
+      const updated = await updateCategoryViaApi(id, updates);
+      setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)));
       await loadMenu();
     } catch (err) {
       console.error('Failed to update category on backend', err);
@@ -422,6 +424,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteCategory = async (id: string) => {
     try {
       await deleteCategoryViaApi(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
       await loadMenu();
     } catch (err) {
       console.error('Failed to delete category on backend', err);
@@ -431,7 +434,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // MenuItem Actions
   const addMenuItem = async (item: Omit<MenuItem, 'id'>) => {
     try {
-      await createMenuItemViaApi(restaurantId, item);
+      const created = await createMenuItemViaApi(restaurantId, item);
+      setMenuItems((prev) => [...prev, created]);
       await loadMenu();
     } catch (err) {
       console.error('Failed to create menu item on backend', err);
@@ -440,7 +444,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
     try {
-      await updateMenuItemViaApi(id, updates);
+      const updated = await updateMenuItemViaApi(id, updates);
+      setMenuItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
       await loadMenu();
     } catch (err) {
       console.error('Failed to update menu item on backend', err);
@@ -450,6 +455,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteMenuItem = async (id: string) => {
     try {
       await deleteMenuItemViaApi(id);
+      setMenuItems((prev) => prev.filter((item) => item.id !== id));
       await loadMenu();
     } catch (err) {
       console.error('Failed to delete menu item on backend', err);

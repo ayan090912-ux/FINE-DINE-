@@ -14,8 +14,8 @@ class CategoryRepository(BaseRepository[Category]):
         query = (
             select(Category)
             .options(
-                selectinload(Category.items).selectinload(MenuItem.variants),
-                selectinload(Category.items).selectinload(MenuItem.addons)
+                selectinload(Category.items.and_(MenuItem.is_deleted == False)).selectinload(MenuItem.variants),
+                selectinload(Category.items.and_(MenuItem.is_deleted == False)).selectinload(MenuItem.addons)
             )
             .where(
                 Category.restaurant_id == restaurant_id,

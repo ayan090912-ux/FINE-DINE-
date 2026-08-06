@@ -111,8 +111,12 @@ class CategoryResponse(CategoryBase):
         from_attributes = True
 
 
+from app.schemas.restaurant import RestaurantResponse
+
+
 class PublicMenuResponse(BaseModel):
     restaurant_id: str
     restaurant_name: str
     currency: str
     categories: List[CategoryResponse]
+    settings: Optional[RestaurantResponse] = None

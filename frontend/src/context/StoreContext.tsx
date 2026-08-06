@@ -56,6 +56,8 @@ import {
   setEmployeeOnlineStatusViaApi,
   logoutEmployeeViaApi,
   deleteEmployeeViaApi,
+  fetchRestaurantSettingsViaApi,
+  updateRestaurantSettingsViaApi,
 } from '../services/api';
 
 import { realtimeWs } from '../services/websocket';
@@ -258,14 +260,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => { localStorage.setItem('df_archived_orders', JSON.stringify(archivedOrders)); }, [archivedOrders]);
   useEffect(() => { localStorage.setItem('df_order_sequence', currentDailyOrderSequence.toString()); }, [currentDailyOrderSequence]);
 
+  // Load Settings Data from Backend API
+  const loadSettings = useCallback(async () => {
+    try {
+      const fetchedSettings = await fetchRestaurantSettingsViaApi(restaurantId);
+      if (fetchedSettings) {
+        setSettings(fetchedSettings);
+      }
+    } catch (err) {
+      console.warn('[DineFlow Store] Backend settings fetch failed.', err);
+    }
+  }, [restaurantId]);
+
   // Load Menu Data from Backend API
   const loadMenu = useCallback(async () => {
     try {
       const data = await fetchPublicMenu(restaurantId);
-      if (data.categories && data.categories.length > 0) setCategories(data.categories);
-      if (data.menuItems && data.menuItems.length > 0) setMenuItems(data.menuItems);
+      if (data.categories) setCategories(data.categories);
+      if (data.menuItems) setMenuItems(data.menuItems);
+      if (data.currency) {
+        setSettings((prev) => ({ ...prev, currencySymbol: data.currency }));
+      }
+      if (data.settings) {
+        setSettings((prev) => ({ ...prev, ...data.settings }));
+      }
     } catch (err) {
-      console.warn('[DineFlow Store] Backend menu fetch failed, using cached menu.', err);
+      console.warn('[DineFlow Store] Backend menu fetch failed.', err);
     }
   }, [restaurantId]);
 
@@ -310,8 +330,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [restaurantId]);
 
   const refreshData = useCallback(async () => {
-    await Promise.all([loadMenu(), loadOrders(), loadRequests(), loadTables(), loadEmployees()]);
-  }, [loadMenu, loadOrders, loadRequests, loadTables, loadEmployees]);
+    await Promise.all([loadMenu(), loadSettings(), loadOrders(), loadRequests(), loadTables(), loadEmployees()]);
+  }, [loadMenu, loadSettings, loadOrders, loadRequests, loadTables, loadEmployees]);
 
   // Initial Load & Realtime WebSocket connection setup
   useEffect(() => {
@@ -331,8 +351,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else if (type === 'CUSTOMER_REQUEST' || type === 'REQUEST_ACCEPTED' || type === 'REQUEST_IN_PROGRESS' || type === 'REQUEST_COMPLETED' || type === 'REQUEST_STATUS_CHANGED') {
         if (type === 'CUSTOMER_REQUEST') soundManager.playWaiterCallChime();
         loadRequests();
-      } else if (type === 'MENU_UPDATED') {
+      } else if (type === 'MENU_UPDATED' || type === 'RESTAURANT_SETTINGS_UPDATED') {
         loadMenu();
+        loadSettings();
       } else if (type === 'TABLE_UPDATED' || type === 'SESSION_STARTED' || type === 'SESSION_UPDATED' || type === 'SESSION_CLOSED') {
         loadTables();
         loadOrders();
@@ -341,18 +362,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
-    // Fallback polling interval (every 8s) to ensure synchronization
+    // Fallback polling interval (every 6s) to ensure synchronization
     const pollInterval = window.setInterval(() => {
+      loadMenu();
+      loadSettings();
       loadOrders();
       loadRequests();
       loadEmployees();
-    }, 8000);
+    }, 6000);
 
     return () => {
       unsubscribe();
       window.clearInterval(pollInterval);
     };
-  }, [restaurantId, refreshData, loadOrders, loadRequests, loadMenu, loadTables, loadEmployees]);
+  }, [restaurantId, refreshData, loadOrders, loadRequests, loadMenu, loadSettings, loadTables, loadEmployees]);
 
   // Employee Actions
   const addEmployee = async (data: any) => {
@@ -635,8 +658,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Settings & Feedback
-  const updateSettings = (updates: Partial<RestaurantSettings>) => {
+  const updateSettings = async (updates: Partial<RestaurantSettings>) => {
     setSettings((prev) => ({ ...prev, ...updates, id: 'dineflow' }));
+    try {
+      const updated = await updateRestaurantSettingsViaApi(restaurantId, updates);
+      setSettings(updated);
+    } catch (err) {
+      console.error('Failed to update restaurant settings on backend', err);
+    }
   };
 
   const submitFeedback = (feedback: Omit<Feedback, 'id' | 'createdAt'>) => {

@@ -23,14 +23,18 @@ class BranchResponse(BranchCreate):
 
 class RestaurantBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
+    tagline: Optional[str] = None
     logo_url: Optional[str] = None
+    cover_url: Optional[str] = None
     banner_url: Optional[str] = None
-    email: str
-    phone: str
+    favicon_url: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     country: str = "US"
-    currency: str = "USD"
+    currency: str = "$"
+    tax_percentage: float = 5.0
     timezone: str = "UTC"
 
 
@@ -40,12 +44,16 @@ class RestaurantCreate(RestaurantBase):
 
 class RestaurantUpdate(BaseModel):
     name: Optional[str] = None
+    tagline: Optional[str] = None
     logo_url: Optional[str] = None
+    cover_url: Optional[str] = None
     banner_url: Optional[str] = None
+    favicon_url: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     currency: Optional[str] = None
+    tax_percentage: Optional[float] = None
     timezone: Optional[str] = None
     is_active: Optional[bool] = None
 

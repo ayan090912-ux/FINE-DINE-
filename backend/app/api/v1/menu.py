@@ -77,3 +77,33 @@ async def delete_menu_item(
     service = MenuService(db)
     success = await service.delete_menu_item(item_id)
     return APIResponse(message="Menu item deleted.", data=success)
+
+
+import os
+import uuid
+from fastapi import File, UploadFile
+from app.core.exceptions import DineFlowException
+
+MENU_UPLOAD_DIR = os.path.join(os.getcwd(), "uploads", "menu")
+os.makedirs(MENU_UPLOAD_DIR, exist_ok=True)
+
+
+@router.post("/upload-image", response_model=APIResponse[dict])
+async def upload_menu_image(
+    file: UploadFile = File(...)
+):
+    """Upload a food dish image directly."""
+    if not file.content_type.startswith("image/"):
+        raise DineFlowException(status_code=400, code="INVALID_FILE_TYPE", detail="Only image files are allowed.")
+
+    filename_ext = os.path.splitext(file.filename)[1] or ".png"
+    unique_filename = f"{uuid.uuid4().hex}{filename_ext}"
+    file_path = os.path.join(MENU_UPLOAD_DIR, unique_filename)
+
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+
+    image_url = f"/uploads/menu/{unique_filename}"
+    return APIResponse(message="Dish image uploaded successfully.", data={"image_url": image_url})
+

@@ -3,7 +3,7 @@ import { MenuItem } from '../../types';
 import { VegBadge } from '../../components/common/StatusBadge';
 import { X, Clock, Flame, Plus, Minus, ShoppingBag, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useStore } from '../../context/StoreContext';
+import { resolveMediaUrl } from '../../services/api';
 
 interface FoodDetailModalProps {
   item: MenuItem | null;
@@ -49,7 +49,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({
           {/* Hero Header Image */}
           <div className="relative h-64 shrink-0 bg-zinc-950">
             <img
-              src={item.imageUrl}
+              src={resolveMediaUrl(item.imageUrl)}
               alt={item.name}
               className="w-full h-full object-cover"
             />

@@ -102,5 +102,6 @@ class MenuService:
             restaurant_id=restaurant.id,
             restaurant_name=restaurant.name,
             currency=restaurant.currency,
-            categories=categories
+            categories=categories,
+            settings=restaurant
         )

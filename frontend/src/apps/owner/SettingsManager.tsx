@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ImageUploader } from '../../components/common/ImageUploader';
+import { resolveMediaUrl } from '../../services/api';
 import {
   Settings,
   Save,
@@ -572,13 +573,13 @@ export const SettingsManager: React.FC = () => {
           <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
             Direct Local Computer Image Uploads
           </h4>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <ImageUploader
               label="Restaurant Logo"
               value={formData.logoUrl}
               onChange={(url) => setFormData({ ...formData, logoUrl: url })}
               aspectRatio="square"
+              uploadType="restaurant"
             />
 
             <ImageUploader
@@ -586,6 +587,7 @@ export const SettingsManager: React.FC = () => {
               value={formData.coverUrl}
               onChange={(url) => setFormData({ ...formData, coverUrl: url })}
               aspectRatio="cover"
+              uploadType="restaurant"
             />
 
             <ImageUploader
@@ -593,6 +595,7 @@ export const SettingsManager: React.FC = () => {
               value={formData.faviconUrl}
               onChange={(url) => setFormData({ ...formData, faviconUrl: url })}
               aspectRatio="square"
+              uploadType="restaurant"
             />
           </div>
 
@@ -603,7 +606,7 @@ export const SettingsManager: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {formData.galleryUrls.map((img, idx) => (
                 <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-800">
-                  <img src={img} alt="Gallery" className="w-full h-full object-cover" />
+                  <img src={resolveMediaUrl(img)} alt="Gallery" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => handleRemoveGalleryImage(idx)}
@@ -619,6 +622,7 @@ export const SettingsManager: React.FC = () => {
                 value=""
                 onChange={(url) => handleAddGalleryImage(url)}
                 aspectRatio="square"
+                uploadType="restaurant"
               />
             </div>
           </div>

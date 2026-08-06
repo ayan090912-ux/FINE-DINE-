@@ -10,14 +10,18 @@ class Restaurant(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
 
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    tagline: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    cover_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     banner_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    favicon_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     email: Mapped[str] = mapped_column(String(120), nullable=False)
     phone: Mapped[str] = mapped_column(String(30), nullable=False)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     country: Mapped[str] = mapped_column(String(50), default="US")
     currency: Mapped[str] = mapped_column(String(10), default="USD")
+    tax_percentage: Mapped[float] = mapped_column(default=5.0)
     timezone: Mapped[str] = mapped_column(String(50), default="UTC")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

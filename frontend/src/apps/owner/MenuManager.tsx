@@ -5,6 +5,7 @@ import { ImageUploader } from '../../components/common/ImageUploader';
 import { VegBadge } from '../../components/common/StatusBadge';
 import { Plus, Edit2, Trash2, X, Sparkles, Check, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { resolveMediaUrl } from '../../services/api';
 
 export const MenuManager: React.FC = () => {
   const { categories, menuItems, addMenuItem, updateMenuItem, deleteMenuItem, addCategory, deleteCategory, settings } = useStore();
@@ -148,7 +149,7 @@ export const MenuManager: React.FC = () => {
               >
                 <div className="flex gap-3">
                   <img
-                    src={item.imageUrl}
+                    src={resolveMediaUrl(item.imageUrl)}
                     alt={item.name}
                     className="w-20 h-20 rounded-xl object-cover bg-zinc-950 shrink-0"
                   />
@@ -296,6 +297,7 @@ export const MenuManager: React.FC = () => {
                   value={editingItem.imageUrl}
                   onChange={(url) => setEditingItem({ ...editingItem, imageUrl: url })}
                   aspectRatio="cover"
+                  uploadType="menu"
                 />
 
                 <div className="grid grid-cols-2 gap-3">

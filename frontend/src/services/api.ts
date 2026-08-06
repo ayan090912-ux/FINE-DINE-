@@ -1,4 +1,4 @@
-import { Category, MenuItem, Order, OrderStatus, ServiceRequest, ServiceRequestType, ServiceRequestStatus, Table, TableSection, TableStatus, Employee } from '../types';
+import { Category, MenuItem, Order, OrderStatus, ServiceRequest, ServiceRequestType, ServiceRequestStatus, Table, TableSection, TableStatus, Employee, RestaurantSettings } from '../types';
 
 const getApiBaseUrl = (): string => {
   const envUrl = (import.meta as any).env?.VITE_API_URL;
@@ -207,12 +207,105 @@ export const normalizeTable = (raw: any): Table => ({
   isActive: Boolean(raw.is_active ?? raw.isActive ?? true),
 });
 
-// Menu APIs
+export const normalizeRestaurantSettings = (raw: any): RestaurantSettings => {
+  if (!raw) {
+    return {
+      id: 'dineflow',
+      name: 'DineFlow Restaurant',
+      tagline: 'Artisanal Dining Experience',
+      logoUrl: '',
+      coverUrl: '',
+      bannerUrl: '',
+      faviconUrl: '',
+      galleryUrls: [],
+      address: '123 Gourmet Ave, San Francisco',
+      phone: '+1 800-DINEFLOW',
+      currencySymbol: '$',
+      taxPercentage: 5.0,
+    };
+  }
+  return {
+    id: raw.id || 'dineflow',
+    name: raw.name || 'DineFlow Restaurant',
+    tagline: raw.tagline || 'Artisanal Dining Experience',
+    logoUrl: resolveMediaUrl(raw.logo_url || raw.logoUrl),
+    coverUrl: resolveMediaUrl(raw.cover_url || raw.coverUrl),
+    bannerUrl: resolveMediaUrl(raw.banner_url || raw.bannerUrl),
+    faviconUrl: resolveMediaUrl(raw.favicon_url || raw.faviconUrl),
+    galleryUrls: (raw.gallery_urls || raw.galleryUrls || []).map((u: string) => resolveMediaUrl(u)),
+    address: raw.address || '',
+    phone: raw.phone || '',
+    currencySymbol: raw.currency || raw.currencySymbol || '$',
+    taxPercentage: Number(raw.tax_percentage ?? raw.taxPercentage ?? 5.0),
+  };
+};
+
+// Menu & Restaurant Settings APIs
 export const fetchPublicMenu = async (restaurantId: string = 'dineflow') => {
   const payload = await apiRequest<any>(`/api/v1/public/menu/${restaurantId}`);
-  const categories = (payload?.data?.categories || payload?.categories || []).map(normalizeCategory);
-  const menuItems = (payload?.data?.categories || payload?.categories || []).flatMap((category: any) => (category.items || []).map(normalizeMenuItem));
-  return { categories, menuItems };
+  const data = payload?.data ?? payload;
+  const rawCategories = data?.categories || [];
+  const categories = rawCategories.map(normalizeCategory);
+  const menuItems = rawCategories.flatMap((category: any) => (category.items || []).map(normalizeMenuItem));
+  const currency = data?.currency || data?.settings?.currency || '$';
+  const settings = data?.settings ? normalizeRestaurantSettings(data.settings) : null;
+  return { categories, menuItems, currency, settings };
+};
+
+export const fetchRestaurantSettingsViaApi = async (restaurantId: string = 'dineflow'): Promise<RestaurantSettings> => {
+  const payload = await apiRequest<any>(`/api/v1/restaurant/settings/${restaurantId}`);
+  const data = payload?.data ?? payload;
+  return normalizeRestaurantSettings(data);
+};
+
+export const updateRestaurantSettingsViaApi = async (restaurantId: string = 'dineflow', updates: Partial<RestaurantSettings>): Promise<RestaurantSettings> => {
+  const bodyPayload: any = {};
+  if (updates.name !== undefined) bodyPayload.name = updates.name;
+  if (updates.tagline !== undefined) bodyPayload.tagline = updates.tagline;
+  if (updates.logoUrl !== undefined) bodyPayload.logo_url = updates.logoUrl;
+  if (updates.coverUrl !== undefined) bodyPayload.cover_url = updates.coverUrl;
+  if (updates.bannerUrl !== undefined) bodyPayload.banner_url = updates.bannerUrl;
+  if (updates.faviconUrl !== undefined) bodyPayload.favicon_url = updates.faviconUrl;
+  if (updates.phone !== undefined) bodyPayload.phone = updates.phone;
+  if (updates.address !== undefined) bodyPayload.address = updates.address;
+  if (updates.currencySymbol !== undefined) bodyPayload.currency = updates.currencySymbol;
+  if (updates.taxPercentage !== undefined) bodyPayload.tax_percentage = updates.taxPercentage;
+
+  const result = await apiRequest<any>(`/api/v1/restaurant/settings/${restaurantId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(bodyPayload),
+  });
+  return normalizeRestaurantSettings(result);
+};
+
+export const uploadMenuImageViaApi = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE_URL}/api/v1/menu/upload-image`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to upload menu image: HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  const rawUrl = json?.data?.image_url || json?.image_url || '';
+  return resolveMediaUrl(rawUrl);
+};
+
+export const uploadRestaurantImageViaApi = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE_URL}/api/v1/restaurant/upload-image`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to upload restaurant image: HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  const rawUrl = json?.data?.image_url || json?.image_url || '';
+  return resolveMediaUrl(rawUrl);
 };
 
 export const createCategoryViaApi = async (restaurantId: string, category: Omit<Category, 'id'>) => {

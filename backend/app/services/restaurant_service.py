@@ -19,9 +19,26 @@ class RestaurantService:
         return restaurant
 
     async def update_restaurant(self, restaurant_id: str, data: RestaurantUpdate) -> Restaurant:
-        restaurant = await self.get_restaurant(restaurant_id)
+        restaurant = await self.restaurant_repo.get_by_identifier(restaurant_id)
+        if not restaurant:
+            raise NotFoundException("Restaurant", restaurant_id)
         update_data = data.model_dump(exclude_unset=True)
-        return await self.restaurant_repo.update(restaurant, update_data)
+        updated = await self.restaurant_repo.update(restaurant, update_data)
+        
+        # Broadcast WS event
+        from app.websockets.connection_manager import ws_manager
+        from app.websockets.events import WSEventType
+        event = {
+            "event_type": WSEventType.RESTAURANT_SETTINGS_UPDATED,
+            "restaurant_id": restaurant_id,
+            "data": {
+                "currency": updated.currency,
+                "tax_percentage": updated.tax_percentage,
+                "name": updated.name,
+            }
+        }
+        await ws_manager.broadcast_to_restaurant(restaurant_id, event)
+        return updated
 
     async def create_branch(self, restaurant_id: str, data: BranchCreate) -> Branch:
         await self.get_restaurant(restaurant_id)

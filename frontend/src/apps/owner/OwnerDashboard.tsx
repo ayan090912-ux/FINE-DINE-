@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { OrderStatus } from '../../types';
 import { OrderStatusBadge } from '../../components/common/StatusBadge';
-import { fetchRestaurantOrders, updateOrderStatusViaApi } from '../../services/api';
+import { fetchRestaurantOrders, updateOrderStatusViaApi, resolveMediaUrl } from '../../services/api';
 
 export const OwnerDashboard: React.FC<{
   onNavigateToBusinessDay?: () => void;
@@ -259,7 +259,7 @@ export const OwnerDashboard: React.FC<{
             </h4>
             {menuItems[0] && (
               <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 flex items-center gap-3">
-                <img src={menuItems[0].imageUrl} alt={menuItems[0].name} className="w-12 h-12 rounded-lg object-cover" />
+                <img src={resolveMediaUrl(menuItems[0].imageUrl)} alt={menuItems[0].name} className="w-12 h-12 rounded-lg object-cover" />
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-white truncate">{menuItems[0].name}</p>
                   <p className="text-[11px] text-amber-400 font-semibold">{settings.currencySymbol}{menuItems[0].price.toFixed(2)}</p>
@@ -313,7 +313,7 @@ export const OwnerDashboard: React.FC<{
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative shrink-0">
                       {emp.photoUrl ? (
-                        <img src={emp.photoUrl} alt={emp.fullName} className="w-10 h-10 rounded-xl object-cover border border-zinc-700" />
+                        <img src={resolveMediaUrl(emp.photoUrl)} alt={emp.fullName} className="w-10 h-10 rounded-xl object-cover border border-zinc-700" />
                       ) : (
                         <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-amber-400 text-xs">
                           {emp.fullName.slice(0, 2).toUpperCase()}

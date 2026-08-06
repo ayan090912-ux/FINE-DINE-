@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ShoppingBag, BellRing, Clock, Star, MapPin } from 'lucide-react';
+import { resolveMediaUrl } from '../../services/api';
 
 interface CustomerHeaderProps {
   tableNumber: string;
@@ -32,7 +33,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
         <div className="flex items-center gap-3">
           {settings.logoUrl && (
             <img
-              src={settings.logoUrl}
+              src={resolveMediaUrl(settings.logoUrl)}
               alt={settings.name}
               className="w-10 h-10 rounded-xl object-cover border border-zinc-800 shadow-md"
             />

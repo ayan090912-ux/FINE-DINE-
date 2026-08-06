@@ -4,6 +4,8 @@ import { VegBadge } from '../../components/common/StatusBadge';
 import { Plus, Flame, Sparkles, Clock, Minus } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
+import { resolveMediaUrl } from '../../services/api';
+
 interface FoodCardProps {
   item: MenuItem;
   quantityInCart: number;
@@ -27,7 +29,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
         className="relative w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-zinc-950 cursor-pointer"
       >
         <img
-          src={item.imageUrl}
+          src={resolveMediaUrl(item.imageUrl)}
           alt={item.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />

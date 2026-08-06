@@ -3,7 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { X, Trash2, Plus, Minus, Tag, Check, ArrowRight, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VegBadge } from '../../components/common/StatusBadge';
-import { createOrderViaApi } from '../../services/api';
+import { createOrderViaApi, resolveMediaUrl } from '../../services/api';
 
 export interface CartItem {
   menuItemId: string;
@@ -153,7 +153,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 return (
                   <div key={menuItemId} className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800 flex items-center gap-3">
                     <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-900 shrink-0 relative">
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={resolveMediaUrl(item.imageUrl)} alt={item.name} className="w-full h-full object-cover" />
                       <div className="absolute top-1 left-1">
                         <VegBadge type={item.vegType} />
                       </div>

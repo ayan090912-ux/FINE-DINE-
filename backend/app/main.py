@@ -35,11 +35,11 @@ async def lifespan(app: FastAPI):
             await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE;"))
             await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS in_progress_at TIMESTAMP WITH TIME ZONE;"))
             await conn.execute(text("ALTER TABLE customer_requests ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE;"))
-            for val in ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'ARCHIVED']:
-                try:
-                    await conn.execute(text(f"ALTER TYPE requeststatus ADD VALUE IF NOT EXISTS '{val}';"))
-                except Exception:
-                    pass
+            await conn.execute(text("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS tagline VARCHAR(255);"))
+            await conn.execute(text("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS cover_url VARCHAR(500);"))
+            await conn.execute(text("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS favicon_url VARCHAR(500);"))
+            await conn.execute(text("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS tax_percentage DOUBLE PRECISION DEFAULT 5.0;"))
+            await conn.execute(text("ALTER TABLE menu_items ALTER COLUMN image_url TYPE TEXT;"))
         except Exception as e:
             logger.warning(f"Migration check notice: {e}")
     logger.info("Database tables initialized successfully.")

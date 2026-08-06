@@ -513,6 +513,12 @@ export const fetchRestaurantTables = async (restaurantId: string = 'dineflow') =
   return (data || []).map(normalizeTable);
 };
 
+export const fetchSingleTableViaApi = async (restaurantId: string = 'dineflow', tableId: string) => {
+  const payload = await apiRequest<any>(`/api/v1/public/table/${encodeURIComponent(tableId)}?restaurant_id=${encodeURIComponent(restaurantId)}`);
+  const data = payload?.data ?? payload;
+  return normalizeTable(data);
+};
+
 export const createTableViaApi = async (restaurantId: string = 'dineflow', table: Omit<Table, 'id' | 'isOccupied'>) => {
   const result = await apiRequest<any>(`/api/v1/tables?restaurant_id=${encodeURIComponent(restaurantId)}`, {
     method: 'POST',

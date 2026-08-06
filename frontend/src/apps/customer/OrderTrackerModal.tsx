@@ -24,7 +24,7 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
 }) => {
   const [, setTick] = useState(0);
 
-  const displayNum = tableNumber || (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
+  const displayNum = tableNumber || tableId.replace(/^t-/, '');
 
   // Force tick every second to keep countdown timers live!
   useEffect(() => {

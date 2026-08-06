@@ -33,6 +33,18 @@ async def get_tables(
     return APIResponse(message="Tables retrieved.", data=tables)
 
 
+@router.get("/{table_id}", response_model=APIResponse[TableResponse])
+async def get_single_table(
+    table_id: str,
+    restaurant_id: Optional[str] = Query(default="dineflow"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Retrieve a single table by UUID or table number."""
+    service = TableQRService(db)
+    table = await service.get_table_by_identifier(restaurant_id or "dineflow", table_id)
+    return APIResponse(message="Table retrieved.", data=table)
+
+
 @router.patch("/{table_id}", response_model=APIResponse[TableResponse])
 async def update_table(
     table_id: str,

@@ -19,6 +19,20 @@ class TableRepository(BaseRepository[Table]):
         result = await self.session.execute(query)
         return result.scalars().first()
 
+    async def get_by_id_or_number(self, restaurant_id: str, identifier: str) -> Optional[Table]:
+        clean_num = identifier.replace("t-", "")
+        query = (
+            select(Table)
+            .options(selectinload(Table.qr_code))
+            .where(
+                Table.restaurant_id == restaurant_id,
+                (Table.id == identifier) | (Table.table_number == identifier) | (Table.table_number == clean_num),
+                Table.is_deleted == False
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalars().first()
+
 
 class QRCodeRepository(BaseRepository[QRCode]):
     def __init__(self, session: AsyncSession):

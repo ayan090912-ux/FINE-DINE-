@@ -25,6 +25,18 @@ async def scan_qr_code(
     return APIResponse(message="QR code scanned successfully.", data=result)
 
 
+@router.get("/table/{table_id}", response_model=APIResponse[TableResponse])
+async def get_public_table(
+    table_id: str,
+    restaurant_id: str = "dineflow",
+    db: AsyncSession = Depends(get_db)
+):
+    """Public table lookup by UUID or table number."""
+    service = TableQRService(db)
+    result = await service.get_table_by_identifier(restaurant_id, table_id)
+    return APIResponse(message="Table resolved successfully.", data=result)
+
+
 @router.get("/menu/{restaurant_id}", response_model=APIResponse[PublicMenuResponse])
 async def get_public_menu(
     restaurant_id: str,

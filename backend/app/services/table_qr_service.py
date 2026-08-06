@@ -48,6 +48,12 @@ class TableQRService:
     async def get_tables_for_restaurant(self, restaurant_id: str) -> List[Table]:
         return await self.table_repo.get_all(filters={"restaurant_id": restaurant_id})
 
+    async def get_table_by_identifier(self, restaurant_id: str, identifier: str) -> Table:
+        table = await self.table_repo.get_by_id_or_number(restaurant_id, identifier)
+        if not table:
+            raise NotFoundException("Table", identifier)
+        return table
+
     async def update_table(self, table_id: str, data: TableUpdate) -> Table:
         table = await self.table_repo.get_by_id(table_id)
         if not table:

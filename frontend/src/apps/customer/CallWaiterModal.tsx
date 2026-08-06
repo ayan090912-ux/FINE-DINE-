@@ -24,7 +24,7 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({
   const [customNote, setCustomNote] = useState('');
   const [submittedType, setSubmittedType] = useState<string | null>(null);
 
-  const displayNum = tableNumber || (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
+  const displayNum = tableNumber || tableId.replace(/^t-/, '');
 
   if (!isOpen) return null;
 

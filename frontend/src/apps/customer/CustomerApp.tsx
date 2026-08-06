@@ -10,6 +10,8 @@ import { CallWaiterModal } from './CallWaiterModal';
 import { FeedbackModal } from './FeedbackModal';
 import { Search, Utensils, Filter, Clock, CheckCircle2 } from 'lucide-react';
 
+import { fetchSingleTableViaApi } from '../../services/api';
+
 interface CustomerAppProps {
   restaurantId: string;
   tableId: string;
@@ -24,6 +26,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non-veg'>('all');
+  const [fetchedTable, setFetchedTable] = useState<any | null>(null);
 
   // Modals & Drawers state
   const [selectedFoodItem, setSelectedFoodItem] = useState<MenuItem | null>(null);
@@ -39,14 +42,23 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     (t) => t.id === tableId || t.tableNumber === tableId || t.tableNumber === tableId.replace(/^t-/, '')
   );
 
-  const cleanTableNumber = matchedTable
-    ? matchedTable.tableNumber
-    : (tableId.includes('-') && tableId.length > 10 ? '04' : tableId.replace(/^t-/, ''));
+  useEffect(() => {
+    if (!matchedTable && tableId) {
+      fetchSingleTableViaApi(restaurantId, tableId)
+        .then((t) => {
+          if (t) setFetchedTable(t);
+        })
+        .catch((err) => console.warn('Failed to fetch table details', err));
+    }
+  }, [matchedTable, restaurantId, tableId]);
 
-  const activeTable = matchedTable || {
+  const resolvedTable = matchedTable || fetchedTable;
+  const cleanTableNumber = resolvedTable ? resolvedTable.tableNumber : tableId.replace(/^t-/, '');
+
+  const activeTable = resolvedTable || {
     id: tableId,
     tableNumber: cleanTableNumber,
-    name: matchedTable?.name || `Table ${cleanTableNumber}`,
+    name: `Table ${cleanTableNumber}`,
   };
 
   // Active orders placed by this table

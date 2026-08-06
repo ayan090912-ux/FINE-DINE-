@@ -31,7 +31,7 @@ function AppContent() {
   if (currentPath.startsWith('/qr/')) {
     const parts = currentPath.split('/');
     const restaurantId = parts[2] || 'dineflow';
-    const tableId = parts[3] || 't-4';
+    const tableId = parts[3] || (tables[0]?.id || '1');
 
     return <CustomerApp restaurantId={restaurantId} tableId={tableId} />;
   }
@@ -76,7 +76,7 @@ function AppContent() {
   }
 
   // 5. Landing / Simulation Router Screen at root '/'
-  const defaultTable = tables[0] || { id: 't-4', tableNumber: '04' };
+  const defaultTable = tables[0] || { id: '1', tableNumber: '1' };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
@@ -205,7 +205,7 @@ function AppContent() {
             onClick={() => navigateTo(`/qr/dineflow/${defaultTable.id}`)}
             className="w-full sm:w-auto px-8 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-extrabold py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-xl shadow-amber-500/20 transition cursor-pointer"
           >
-            Open Customer QR App (Table 04)
+            Open Customer QR App (Table {defaultTable.tableNumber})
           </button>
         </div>
       </div>
